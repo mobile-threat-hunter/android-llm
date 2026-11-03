@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Android LLM Suite</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-dim: #1f6feb33;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 16px;
+    height: 52px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  header .brand {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  header .brand span { color: var(--accent); }
+  nav { display: flex; gap: 4px; height: 100%; }
+  nav button {
+    appearance: none;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-size: 13.5px;
+    font-family: inherit;
+    padding: 0 14px;
+    cursor: pointer;
+    height: 100%;
+  }
+  nav button:hover { color: var(--text); }
+  nav button.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+  header .ver {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  main { flex: 1; position: relative; overflow: hidden; }
+  .view {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+  .view.active { display: block; }
+  .view iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: var(--bg);
+  }
+  /* 홈 랜딩 */
+  #home { overflow-y: auto; }
+  .hero { text-align: center; padding: 56px 20px 8px; }
+  .hero h1 { font-size: 26px; font-weight: 800; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { color: var(--muted); margin-top: 10px; font-size: 14px; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
+    justify-content: center;
+    gap: 18px;
+    padding: 36px 24px 56px;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 22px 20px;
+    cursor: pointer;
+    transition: border-color .15s, transform .15s;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .card img { width: 44px; height: 44px; border-radius: 8px; margin-bottom: 14px; }
+  .card h2 { font-size: 16px; margin-bottom: 6px; }
+  .card .tag {
+    display: inline-block;
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border-radius: 999px;
+    padding: 2px 9px;
+    margin-bottom: 10px;
+  }
+  .card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand" onclick="show('home')">Android <span>LLM</span> Suite</div>
+  <nav id="nav">
+    <button data-view="home" class="active" onclick="show('home')">홈</button>
+    <button data-view="dexllm" onclick="show('dexllm')">dexllm · DEX</button>
+    <button data-view="axmlllm" onclick="show('axmlllm')">axmlllm · AXML</button>
+    <button data-view="apkllm" onclick="show('apkllm')">apkllm · APK</button>
+  </nav>
+  <div class="ver" id="ver"></div>
+</header>
+<main>
+  <div class="view active" id="view-home">
+    <div id="home">
+      <div class="hero">
+        <h1>Android <span>LLM</span> Suite</h1>
+        <p>DEX 바이트코드 · AndroidManifest(AXML) · APK 컨테이너 — llm 시리즈 웹 분석 도구 통합 콘솔</p>
+      </div>
+      <div class="cards">
+        <div class="card" onclick="show('dexllm')">
+          <img src="dexllm-web/dexllm_logo.png" alt="" onerror="this.style.display='none'">
+          <h2>dexllm-web</h2>
+          <div class="tag">DEX bytecode</div>
+          <p>DEX 파싱·디컴파일·xref·IOC 추출. WASM 엔진으로 브라우저에서 APK/DEX를 직접 분석.</p>
+        </div>
+        <div class="card" onclick="show('axmlllm')">
+          <img src="axmlllm-web/axmlllm_logo.png" alt="" onerror="this.style.display='none'">
+          <h2>axmlllm-web</h2>
+          <div class="tag">AndroidManifest / AXML</div>
+          <p>바이너리 XML(AXML) 디코딩과 매니페스트 구조 분석. 선언 권한·컴포넌트를 육안 검증.</p>
+        </div>
+        <div class="card" onclick="show('apkllm')">
+          <img src="apkllm-web/apkllm_logo.png" alt="" onerror="this.style.display='none'">
+          <h2>apkllm-web</h2>
+          <div class="tag">APK container</div>
+          <p>APK/ZIP 컨테이너 구조·서명·엔트리 분석. 패킹/변조 흔적을 컨테이너 수준에서 점검.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="view" id="view-dexllm" data-src="dexllm-web/index.html"></div>
+  <div class="view" id="view-axmlllm" data-src="axmlllm-web/index.html"></div>
+  <div class="view" id="view-apkllm" data-src="apkllm-web/index.html"></div>
+</main>
+<script>
+  // 탭 전환. iframe은 첫 진입 시 1회만 생성(lazy)하고 이후 유지 — 분석 상태 보존.
+  function show(name) {
+    document.querySelectorAll('#nav button').forEach(b =>
+      b.classList.toggle('active', b.dataset.view === name));
+    document.querySelectorAll('.view').forEach(v =>
+      v.classList.toggle('active', v.id === 'view-' + name));
+    const view = document.getElementById('view-' + name);
+    if (view && view.dataset.src && !view.querySelector('iframe')) {
+      const f = document.createElement('iframe');
+      f.src = view.dataset.src;
+      view.appendChild(f);
+    }
+  }
+  // 서브모듈 핀 버전 표시 (serve 환경에서 versions.json이 있으면)
+  fetch('versions.json').then(r => r.ok ? r.json() : null).then(v => {
+    if (v) document.getElementById('ver').textContent =
+      Object.entries(v).map(([k, x]) => `${k} ${x}`).join(' · ');
+  }).catch(() => {});
+</script>
+</body>
+</html>

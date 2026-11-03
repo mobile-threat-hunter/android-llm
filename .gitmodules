@@ -1,0 +1,9 @@
+[submodule "dexllm-web"]
+	path = dexllm-web
+	url = https://github.com/mobile-threat-hunter/dexllm-web.git
+[submodule "axmlllm-web"]
+	path = axmlllm-web
+	url = https://github.com/mobile-threat-hunter/axmlllm-web.git
+[submodule "apkllm-web"]
+	path = apkllm-web
+	url = https://github.com/mobile-threat-hunter/apkllm-web.git
