@@ -1,0 +1,36 @@
+# v* 태그 push → Windows exe 빌드 → GitHub Release에 첨부
+name: release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "기존 태그 (exe 재빌드·재첨부)"
+        required: true
+permissions:
+  contents: write
+jobs:
+  exe:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          submodules: recursive
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - run: cmd/android-llm/build.sh "$TAG"
+      - name: release
+        run: |
+          exe="dist/android-llm-$TAG-windows-amd64.exe"
+          notes="$(python3 -c "import json;print('\n'.join(f'- {k} {v}' for k,v in json.load(open('versions.json')).items()))")"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$exe" --clobber
+          else
+            gh release create "$TAG" "$exe" --title "$TAG" --notes "$(printf 'Windows: %s 실행 → 브라우저가 열림 (오프라인 동작)\n\n%s' "${exe#dist/}" "$notes")"
+          fi

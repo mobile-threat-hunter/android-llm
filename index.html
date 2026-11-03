@@ -113,6 +113,27 @@
     margin-bottom: 10px;
   }
   .card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
+  /* 통합 드롭존 — 파일 하나를 세 도구에 동시에 */
+  .dropzone {
+    max-width: 1000px; margin: 28px auto 0; padding: 34px 20px;
+    border: 2px dashed var(--border); border-radius: 12px; text-align: center;
+    background: var(--panel); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .dropzone:hover, body.drag .dropzone { border-color: var(--accent); background: var(--accent-dim); }
+  .dropzone b { font-size: 16px; }
+  .dropzone p { color: var(--muted); font-size: 12.5px; margin-top: 8px; }
+  .dropzone .cur { margin-top: 12px; font-size: 13px; color: var(--accent); }
+  nav button .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    margin-left: 7px; vertical-align: middle; background: transparent;
+  }
+  nav button .dot.busy { background: #d29922; animation: pulse 1s infinite; }
+  nav button .dot.ok { background: #3fb950; }
+  nav button .dot.err { background: #f85149; }
+  nav button .dot.skip { background: var(--border); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  header .sync { font-size: 12px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  header .file { font-size: 12px; color: var(--text); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -120,10 +141,12 @@
   <div class="brand" onclick="show('home')">Android <span>LLM</span> Suite</div>
   <nav id="nav">
     <button data-view="home" class="active" onclick="show('home')">홈</button>
-    <button data-view="dexllm" onclick="show('dexllm')">dexllm · DEX</button>
-    <button data-view="axmlllm" onclick="show('axmlllm')">axmlllm · AXML</button>
-    <button data-view="apkllm" onclick="show('apkllm')">apkllm · APK</button>
+    <button data-view="dexllm" onclick="show('dexllm')">dexllm · DEX<span class="dot"></span></button>
+    <button data-view="axmlllm" onclick="show('axmlllm')">axmlllm · AXML<span class="dot"></span></button>
+    <button data-view="apkllm" onclick="show('apkllm')">apkllm · APK<span class="dot"></span></button>
   </nav>
+  <div class="file" id="curfile"></div>
+  <label class="sync" title="한 도구에 파일을 열면 나머지 도구에도 같은 파일을 연다"><input type="checkbox" id="sync" checked>동시 분석</label>
   <div class="ver" id="ver"></div>
 </header>
 <main>
@@ -133,6 +156,13 @@
         <h1>Android <span>LLM</span> Suite</h1>
         <p>DEX 바이트코드 · AndroidManifest(AXML) · APK 컨테이너 — llm 시리즈 웹 분석 도구 통합 콘솔</p>
       </div>
+      <label class="dropzone" id="dropzone">
+        <input type="file" id="suitefile" hidden accept=".apk,.apks,.xapk,.zip,.jar,.dex,.xml,application/octet-stream">
+        <b>APK를 여기에 드롭 (또는 클릭)</b>
+        <p>세 도구(DEX · AXML · APK 컨테이너)가 같은 파일을 동시에 분석합니다. 파일은 브라우저 밖으로 나가지 않습니다.<br>
+           .dex는 dexllm, 바이너리 AndroidManifest.xml은 axmlllm에만 들어갑니다.</p>
+        <div class="cur" id="dzcur"></div>
+      </label>
       <div class="cards">
         <div class="card" onclick="show('dexllm')">
           <img src="dexllm-web/dexllm_logo.png" alt="" onerror="this.style.display='none'">
@@ -160,19 +190,124 @@
   <div class="view" id="view-apkllm" data-src="apkllm-web/index.html"></div>
 </main>
 <script>
+  const TOOLS = ['dexllm', 'axmlllm', 'apkllm'];
+  // 각 도구의 엔진 준비 여부 — 도구 페이지의 최상위 바인딩을 same-origin으로 읽는다.
+  // (apkllm은 worker가 init → load 순서로 처리하므로 바로 넣어도 된다.)
+  const READY = {
+    dexllm: 'typeof Module !== "undefined" && Module !== null',
+    axmlllm: 'typeof engineReady !== "undefined" && engineReady',
+    apkllm: 'typeof loadFile === "function"',
+  };
+  const $ = id => document.getElementById(id);
+
+  function frame(name) {
+    const view = $('view-' + name);
+    let f = view.querySelector('iframe');
+    if (!f) {
+      f = document.createElement('iframe');
+      f.src = view.dataset.src;
+      f.addEventListener('load', () => hookFrame(name, f));
+      view.appendChild(f);
+    }
+    return f;
+  }
+
   // 탭 전환. iframe은 첫 진입 시 1회만 생성(lazy)하고 이후 유지 — 분석 상태 보존.
   function show(name) {
     document.querySelectorAll('#nav button').forEach(b =>
       b.classList.toggle('active', b.dataset.view === name));
     document.querySelectorAll('.view').forEach(v =>
       v.classList.toggle('active', v.id === 'view-' + name));
-    const view = document.getElementById('view-' + name);
-    if (view && view.dataset.src && !view.querySelector('iframe')) {
-      const f = document.createElement('iframe');
-      f.src = view.dataset.src;
-      view.appendChild(f);
-    }
+    if (TOOLS.includes(name)) frame(name);
   }
+
+  function dot(name, cls, title) {
+    const d = document.querySelector(`#nav button[data-view="${name}"] .dot`);
+    d.className = 'dot ' + (cls || '');
+    d.title = title || '';
+  }
+
+  // 파일 종류 판별: ZIP(APK 등) → 세 도구 모두, DEX → dexllm, AXML → axmlllm
+  async function targets(file) {
+    const h = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    if (h[0] === 0x50 && h[1] === 0x4b) return TOOLS;
+    if (h[0] === 0x64 && h[1] === 0x65 && h[2] === 0x78) return ['dexllm'];
+    if (h[0] === 0x03 && h[1] === 0x00 && h[2] === 0x08 && h[3] === 0x00) return ['axmlllm'];
+    return TOOLS;
+  }
+
+  function whenReady(name, f, timeoutMs = 180000) {
+    const t0 = Date.now();
+    return new Promise((res, rej) => {
+      (function poll() {
+        try {
+          const w = f.contentWindow;
+          if (w && w.document.readyState !== 'loading' && w.eval(READY[name])) return res(w);
+        } catch (_) { /* 아직 로드 중 */ }
+        if (Date.now() - t0 > timeoutMs) return rej(new Error('engine load timeout'));
+        setTimeout(poll, 150);
+      })();
+    });
+  }
+
+  let gen = 0;
+  // file을 대상 도구들에 연다. except: 이미 스스로 연 도구(그 도구 안에서 드롭한 경우).
+  async function openAll(file, except) {
+    const my = ++gen;
+    const list = await targets(file);
+    $('curfile').textContent = file.name;
+    $('curfile').title = file.name;
+    $('dzcur').textContent = '현재 파일: ' + file.name;
+    for (const name of TOOLS) {
+      if (name === except) { dot(name, 'ok', file.name); continue; }
+      if (!list.includes(name)) { dot(name, 'skip', '이 파일 형식은 해당 없음'); continue; }
+      dot(name, 'busy', '로드 중…');
+      const f = frame(name);
+      whenReady(name, f)
+        .then(w => { if (my === gen) return w.loadFile(file); })
+        .then(() => { if (my === gen) dot(name, 'ok', file.name); })
+        .catch(e => { if (my === gen) dot(name, 'err', e.message); });
+    }
+    return list;
+  }
+
+  // 도구 iframe 안에서 직접 연 파일도 나머지 도구로 퍼뜨린다 (동시 분석 켜짐일 때).
+  // 각 도구의 "메인 파일" 입구만 본다 — dexllm의 dump 추가(dexbar) 같은 보조 입력은 제외.
+  const MAIN_DROP = { dexllm: '#drop', axmlllm: '#drop', apkllm: null /* 문서 전체 */ };
+  function hookFrame(name, f) {
+    const w = f.contentWindow, d = w.document;
+    const fan = file => { if ($('sync').checked && file) openAll(file, name); };
+    d.addEventListener('drop', e => {
+      const sel = MAIN_DROP[name];
+      if (sel && !(e.target.closest && e.target.closest(sel))) return;
+      fan(e.dataTransfer && e.dataTransfer.files[0]);
+    }, true);
+    d.addEventListener('change', e => {
+      if (e.target.id === 'file') fan(e.target.files && e.target.files[0]);
+    }, true);
+  }
+
+  // 셸(홈/헤더)에 드롭하거나 드롭존 클릭으로 고르면 세 도구 모두에 연다.
+  ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => {
+    e.preventDefault(); document.body.classList.add('drag');
+  }));
+  ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => {
+    e.preventDefault(); document.body.classList.remove('drag');
+  }));
+  document.addEventListener('drop', async e => {
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const list = await openAll(file);
+    if (!document.querySelector('.view.active[data-src]')) show(list[0]);
+  });
+  $('suitefile').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const list = await openAll(file);
+    show(list[0]);
+  });
+
   // 서브모듈 핀 버전 표시 (serve 환경에서 versions.json이 있으면)
   fetch('versions.json').then(r => r.ok ? r.json() : null).then(v => {
     if (v) document.getElementById('ver').textContent =
