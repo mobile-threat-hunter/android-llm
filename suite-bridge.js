@@ -127,9 +127,22 @@ const Bridge = (() => {
     return dw;
   }
 
-  // 매니페스트 컴포넌트 → 구현 클래스 (activity-alias는 클래스가 아니므로 targetActivity). 못 찾으면 null
-  function componentClass(name, tag, ax) {
-    if (tag !== 'activity-alias') return name;
+  // axmlllm 표의 열 값 — 머리행(th) 텍스트로 열을 찾는다 (axmlllm이 target_activity·declared_name 열을 조건부로 넣음)
+  function colText(tr, key) {
+    const head = tr.closest('table').rows[0];
+    const i = [...head.cells].findIndex(c => c.textContent.trim() === key);
+    return i < 0 || !tr.cells[i] ? '' : tr.cells[i].textContent.trim();
+  }
+  // Components 행 → { name, tag, cls }. activity-alias는 클래스가 아니므로 cls = 그 alias가 띄우는 클래스.
+  // axmlllm ≥ v0.5.1은 target_activity 열을 기기와 같은 규칙(ResID → buildClassName)으로 채워 준다 — 그 값을 쓰고,
+  // 열이 없는 예전 axmlllm이면 매니페스트 트리에서 직접 푼다.
+  function compRow(tr, ax) {
+    const name = tr.cells[0].textContent.trim();
+    const tag = tr.dataset.kind || colText(tr, 'tag');
+    if (tag !== 'activity-alias') return { name, tag, cls: name };
+    return { name, tag, cls: colText(tr, 'target_activity') || aliasTargetFromTree(name, ax) };
+  }
+  function aliasTargetFromTree(name, ax) {
     const pkg = ax.eval('last.tree.root.attributes.find(a => a.key === "package")?.value') || '';
     const app = (ax.eval('last.tree.root.children') || []).find(c => c.tag === 'application');
     const al = (app && app.children || []).find(c => c.tag === 'activity-alias' &&
@@ -140,11 +153,10 @@ const Bridge = (() => {
   }
   const descOf = cls => 'L' + cls.replace(/\./g, '/') + ';';
 
-  async function gotoComponent(name, tag, ax) {
+  async function gotoComponent({ name, tag, cls }, ax) {
     const fileName = ax.eval('session && session.name');
     const dw = dexFor(fileName);
     if (!dw) return;
-    const cls = componentClass(name, tag, ax);
     if (!cls) { toast(`${name}: activity-alias의 targetActivity를 찾지 못했습니다.`, 'warn'); return; }
     const desc = descOf(cls);
     // 확인은 axmlllm 탭에 머문 채로 — dex에 없으면 탭을 넘기지 않는다
@@ -158,7 +170,7 @@ const Bridge = (() => {
     }
     show('dexllm');
     dw.navigateToClass(desc);
-    toast(`${tag} → ${cls}`);
+    toast(tag === 'activity-alias' ? `alias ${name} → ${cls}` : `${tag} → ${cls}`);
   }
 
   async function gotoPermission(perm, ax) {
@@ -230,16 +242,23 @@ const Bridge = (() => {
 
     let ch = 0, ct = 0;
     rows('comps').forEach((r, i) => {
-      const td = r.cells[0], cls = componentClass(td.textContent.trim(), (r.cells[1] || {}).textContent?.trim(), ax);
+      const td = r.cells[0], { tag, cls } = compRow(r, ax);
+      const alias = tag === 'activity-alias';
       r.dataset.suiteIdx = i; ct++;
+      if (alias) {   // target_activity 칸도 같은 색으로 — 어느 클래스와 매칭했는지 보이게
+        const ti = [...r.closest('table').rows[0].cells].findIndex(c => c.textContent.trim() === 'target_activity');
+        if (ti >= 0 && r.cells[ti]) r.cells[ti].classList.add('suite-target');
+      }
       if (cls && classes.has(descOf(cls))) {
         r.dataset.suiteEv = 'hit'; r.dataset.suiteRank = 0; ch++;
-        td.dataset.suiteBadge = cls === td.textContent.trim() ? 'dex ✓' : 'dex ✓ → ' + cls.split('.').pop();
-        td.title = 'dex에 구현 클래스가 있음 — 클릭하면 dexllm에서 연다';
+        td.dataset.suiteBadge = alias ? 'dex ✓ target' : 'dex ✓';
+        td.title = alias ? `alias가 띄우는 ${cls}가 dex에 있음 — 클릭하면 dexllm에서 연다`
+                         : 'dex에 구현 클래스가 있음 — 클릭하면 dexllm에서 연다';
       } else {
         r.dataset.suiteEv = 'miss'; r.dataset.suiteRank = 1;
-        td.dataset.suiteBadge = 'dex에 없음';
-        td.title = 'dex에 구현 클래스가 없음 — 매니페스트에만 선언 (패킹·동적 로딩·split APK·미사용 선언 가능성)';
+        td.dataset.suiteBadge = alias ? (cls ? 'target dex에 없음' : 'target 불명') : 'dex에 없음';
+        td.title = alias ? (cls ? `alias가 띄우는 ${cls}가 dex에 없음 — 패킹·동적 로딩 단서` : 'targetActivity를 정적으로 확정할 수 없음')
+                         : 'dex에 구현 클래스가 없음 — 매니페스트에만 선언 (패킹·동적 로딩·split APK·미사용 선언 가능성)';
       }
     });
     let ph = 0, pt = 0;
@@ -266,13 +285,17 @@ const Bridge = (() => {
   // evidence first: 근거 순(Components: dex에 있음 → 없음, Permissions: 호출 클래스 많은 순 → 없음), 같으면 원래 순서
   function applySort(ax) {
     const d = ax.document;
+    const cmp = (a, b) => (evSort ? (+a.dataset.suiteRank) - (+b.dataset.suiteRank) : 0) || a.dataset.suiteIdx - b.dataset.suiteIdx;
     for (const id of ['comps', 'perms']) {
-      const t = d.getElementById(id);
-      const rows = [...t.rows].filter(r => r.dataset.suiteIdx !== undefined);
-      if (!rows.length) continue;
-      rows.sort((a, b) => (evSort ? (+a.dataset.suiteRank) - (+b.dataset.suiteRank) : 0) || a.dataset.suiteIdx - b.dataset.suiteIdx);
-      const body = rows[0].parentNode;
-      for (const r of rows) body.appendChild(r);
+      // 데이터가 아닌 행(머리행, axmlllm의 종류별 그룹 행 tr.grp)을 경계로 구간마다 정렬 — 행이 자기 그룹을 벗어나지 않게
+      const all = [...d.getElementById(id).rows];
+      let anchor = all[0], seg = [];
+      const flush = () => { seg.sort(cmp); let a = anchor; for (const r of seg) { a.after(r); a = r; } seg = []; };
+      for (const r of all.slice(1)) {
+        if (r.dataset.suiteIdx !== undefined) seg.push(r);
+        else { flush(); anchor = r; }
+      }
+      flush();
     }
     for (const b of d.querySelectorAll('.suite-evsort')) b.classList.toggle('on', evSort);
   }
@@ -287,6 +310,8 @@ const Bridge = (() => {
       color: #5fdca0; box-shadow: inset 3px 0 0 #5fdca0;
     }
     #comps tr[data-suite-ev=miss] td.mono:first-child { color: #f0b429; box-shadow: inset 3px 0 0 #f0b429; }
+    #comps tr[data-suite-ev=hit] td.suite-target { color: #5fdca0; }
+    #comps tr[data-suite-ev=miss] td.suite-target { color: #f0b429; }
     /* 근거가 확인된 뒤 dex에 없는 행은 이동하지 않는다 — 클릭 가능해 보이지 않게 */
     #comps tr[data-suite-ev=miss] td.mono:first-child, #perms tr[data-suite-idx]:not([data-suite-ev]) td.mono:first-child {
       cursor: help; text-decoration: none !important;
@@ -317,8 +342,7 @@ const Bridge = (() => {
     st.textContent = AXML_CSS;
     d.head.appendChild(st);
     for (const [id, what] of [['perms', 'dexllm permissions 패널'], ['comps', 'dexllm 클래스']]) {
-      const h2 = d.getElementById(id)?.parentElement?.previousElementSibling;   // <h2> 바로 뒤 div.scroll > table
-      const cnt = h2 && h2.querySelector('.muted');
+      const cnt = d.getElementById(id === 'perms' ? 'perm-count' : 'comp-count');   // 섹션 <h2> 안의 개수 표시
       if (cnt) cnt.insertAdjacentHTML('afterend',
         `<button class="suite-evsort" type="button" title="dexllm 근거가 있는 행을 위로 (Components: dex에 클래스 있음, Permissions: 호출 클래스 많은 순). 끄면 매니페스트 순서">⚑ dex evidence first</button>` +
         `<span class="suite-hint">이름 클릭 → ${what} · <span id="suite-evcount-${id}">dex 근거: dexllm 분석 후 표시</span></span>`);
@@ -334,10 +358,9 @@ const Bridge = (() => {
       if (!w.getSelection().isCollapsed) return;   // 드래그 선택은 이동하지 않음
       const td = e.target.closest && e.target.closest('#comps td.mono:first-child, #perms td.mono:first-child');
       if (!td) return;
-      const name = td.textContent.trim(), tag = (td.parentElement.cells[1] || {}).textContent || '';
-      if (!name) return;
-      if (td.closest('#comps')) gotoComponent(name, tag.trim(), w);
-      else gotoPermission(name, w);
+      if (!td.textContent.trim()) return;
+      if (td.closest('#comps')) gotoComponent(compRow(td.parentElement, w), w);
+      else gotoPermission(td.textContent.trim(), w);
     });
   }
 

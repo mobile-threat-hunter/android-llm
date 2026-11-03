@@ -15,7 +15,7 @@ dexllm-web(DEX) · axmlllm-web(AXML/Manifest) · apkllm-web(APK 컨테이너)을
 |---|---|---|
 | axmlllm 매니페스트 | apkllm Install gate | `extractNativeLibs` · `targetSdk` · base APK 여부를 자동 입력 → native lib 검사 등 판정이 unknown에서 확정값으로. 미선언 값은 플랫폼 기본값(근거 표시), 정적으로 확정 불가한 값은 unknown 유지 |
 | dexllm 분석 결과 | axmlllm Components · Permissions 표 | dex 근거 하이라이트 — Components: 구현 클래스가 dex에 있으면 초록 `dex ✓`, 없으면 주황 `dex에 없음`(패킹·동적 로딩 단서). Permissions: 그 권한의 gated API를 dex가 호출하면 초록 `N API · M class`. 헤더의 **⚑ dex evidence first** 토글로 근거 있는 행을 위로 정렬 (Permissions는 호출 클래스 많은 순) |
-| axmlllm Components 행 | dexllm 클래스 | 이름 클릭 → 해당 클래스 디컴파일 (activity-alias는 targetActivity). dex에 없으면 탭을 넘기지 않고 "매니페스트에만 선언됨" 경고 |
+| axmlllm Components 행 | dexllm 클래스 | 이름 클릭 → 해당 클래스 디컴파일 (activity-alias는 axmlllm의 target_activity 클래스로 매칭·이동, target 칸도 같은 색). dex에 없으면 탭을 넘기지 않고 "매니페스트에만 선언됨" 경고 |
 | axmlllm Permissions 행 | dexllm permissions 패널 | 이름 클릭 → 그 권한으로 필터, gated API별 호출자 펼침, 첫 호출 클래스로 이동. dexllm permissions에 없으면 탭을 넘기지 않고 "선언만 됨" 경고 |
 
 ## 구조
