@@ -251,6 +251,9 @@
         try {
           const w = f.contentWindow;
           if (w && w.document.readyState !== 'loading' && w.eval(READY[name])) return res(w);
+          // 세 도구 모두 엔진 실패 시 #status에 "engine load failed"를 띄운다 — 타임아웃까지 기다리지 않는다
+          const st = w && w.document.getElementById('status');
+          if (st && /engine load failed/.test(st.textContent)) return rej(new Error(st.textContent.trim().slice(0, 200)));
         } catch (_) { /* 아직 로드 중 */ }
         if (Date.now() - t0 > timeoutMs) return rej(new Error('engine load timeout'));
         setTimeout(poll, 150);
