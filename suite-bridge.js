@@ -5,6 +5,7 @@
 //   dexllm → axmlllm   Components/Permissions 행에 dex 근거 하이라이트 + evidence-first 정렬
 //   axmlllm → dexllm   Components 행 클릭 → 해당 클래스 디컴파일
 //                      Permissions 행 클릭 → dexllm permissions 패널(그 권한의 gated API → 호출 클래스)
+//                      dex에 없는 클래스·권한은 탭을 넘기지 않고 axmlllm에서 경고만 띄운다
 //
 // 셸(index.html)이 쓰는 진입점: Bridge.hook(name, iframe), Bridge.opened(name, fileName, gen)
 const Bridge = (() => {
@@ -146,7 +147,7 @@ const Bridge = (() => {
     const cls = componentClass(name, tag, ax);
     if (!cls) { toast(`${name}: activity-alias의 targetActivity를 찾지 못했습니다.`, 'warn'); return; }
     const desc = descOf(cls);
-    show('dexllm');
+    // 확인은 axmlllm 탭에 머문 채로 — dex에 없으면 탭을 넘기지 않는다
     if (!await until(() => dw.eval('Module !== null && allClasses.length > 0'), { timeout: 60000 })) {
       toast('dexllm이 아직 분석 중입니다. 잠시 후 다시 클릭하세요.', 'warn'); return;
     }
@@ -155,6 +156,7 @@ const Bridge = (() => {
         '(패킹·동적 로딩·split APK·미사용 선언 가능성).', 'warn');
       return;
     }
+    show('dexllm');
     dw.navigateToClass(desc);
     toast(`${tag} → ${cls}`);
   }
@@ -163,24 +165,24 @@ const Bridge = (() => {
     const fileName = ax.eval('session && session.name');
     const dw = dexFor(fileName);
     if (!dw) return;
-    show('dexllm');
+    // 확인은 axmlllm 탭에 머문 채로 — dex permissions에 없으면 탭을 넘기지 않는다
     if (!await until(() => dw.eval('Module !== null && allClasses.length > 0 && !permPending'), { timeout: 120000 })) {
       toast('dexllm이 아직 권한 호출 분석 중입니다. 잠시 후 다시 클릭하세요.', 'warn'); return;
     }
-    const d = dw.document;
     const q = JSON.stringify(perm);
     const level = dw.eval(`permIndex.find(p => p.perm === ${q})?.level`);
-    if (level) dw.eval(`activePermLevels.add(${JSON.stringify(level)})`);   // 레벨 칩으로 숨겨져 있으면 다시 켠다
-    dw.eval('permTab = "perms"');
-    const pf = d.getElementById('permfilter');
-    pf.value = perm;
-    // input 이벤트 대신 직접 렌더 — 디바운스 재렌더가 아래에서 펼친 행을 다시 접지 않게
-    dw.renderPermPanel();
     if (!level) {
-      toast(`${perm.replace(/^android\.permission\./, '')} — dex에서 이 권한으로 보호되는 API 호출을 찾지 못했습니다. ` +
+      toast(`${perm.replace(/^android\.permission\./, '')} — dexllm permissions에 없습니다: dex에서 이 권한으로 보호되는 API 호출을 찾지 못했습니다. ` +
         '선언만 됐거나 리플렉션·네이티브·동적 코드로 호출될 수 있습니다(정적 분석 범위 밖).', 'warn');
       return;
     }
+    show('dexllm');
+    const d = dw.document;
+    dw.eval(`activePermLevels.add(${JSON.stringify(level)})`);   // 레벨 칩으로 숨겨져 있으면 다시 켠다
+    dw.eval('permTab = "perms"');
+    d.getElementById('permfilter').value = perm;
+    // input 이벤트 대신 직접 렌더 — 디바운스 재렌더가 아래에서 펼친 행을 다시 접지 않게
+    dw.renderPermPanel();
     // 이 권한 헤더 아래 행만 펼치고, 첫 호출 클래스로 이동 (나머지는 패널에서 고른다)
     const body = d.getElementById('permpanelbody');
     let inPerm = false, first = null;
@@ -285,6 +287,11 @@ const Bridge = (() => {
       color: #5fdca0; box-shadow: inset 3px 0 0 #5fdca0;
     }
     #comps tr[data-suite-ev=miss] td.mono:first-child { color: #f0b429; box-shadow: inset 3px 0 0 #f0b429; }
+    /* 근거가 확인된 뒤 dex에 없는 행은 이동하지 않는다 — 클릭 가능해 보이지 않게 */
+    #comps tr[data-suite-ev=miss] td.mono:first-child, #perms tr[data-suite-idx]:not([data-suite-ev]) td.mono:first-child {
+      cursor: help; text-decoration: none !important;
+    }
+    #perms tr[data-suite-idx]:not([data-suite-ev]) td.mono:first-child:hover { color: inherit; }
     td.mono:first-child[data-suite-badge]::after {
       content: attr(data-suite-badge); display: inline-block; margin-left: 10px; padding: 0 7px; border-radius: 999px;
       font: 600 10px/1.7 var(--f-ui, sans-serif); letter-spacing: .02em; vertical-align: 1px; text-decoration: none;
