@@ -2,6 +2,7 @@
 // 도구 저장소는 손대지 않는다. 도구 쪽 이름이 바뀌면 이 파일만 고칠 것 (CLAUDE.md 참고).
 //
 //   axmlllm → apkllm   매니페스트 사실(extractNativeLibs · targetSdk · split 여부)을 Gate 입력에 자동 기입
+//   dexllm → axmlllm   Components/Permissions 행에 dex 근거 하이라이트 + evidence-first 정렬
 //   axmlllm → dexllm   Components 행 클릭 → 해당 클래스 디컴파일
 //                      Permissions 행 클릭 → dexllm permissions 패널(그 권한의 gated API → 호출 클래스)
 //
@@ -12,7 +13,7 @@ const Bridge = (() => {
     return f && f.contentWindow;
   };
   const fileOf = {};          // 도구별로 마지막에 연 파일 이름 (셸이 알려준 것)
-  let curGen = 0, syncedGen = 0;
+  let curGen = 0, syncedGen = 0, annotGen = 0;
 
   // ── 토스트 ──
   let toastTimer = null;
@@ -125,22 +126,26 @@ const Bridge = (() => {
     return dw;
   }
 
+  // 매니페스트 컴포넌트 → 구현 클래스 (activity-alias는 클래스가 아니므로 targetActivity). 못 찾으면 null
+  function componentClass(name, tag, ax) {
+    if (tag !== 'activity-alias') return name;
+    const pkg = ax.eval('last.tree.root.attributes.find(a => a.key === "package")?.value') || '';
+    const app = (ax.eval('last.tree.root.children') || []).find(c => c.tag === 'application');
+    const al = (app && app.children || []).find(c => c.tag === 'activity-alias' &&
+      (c.attributes || []).some(a => a.key === 'name' && (a.value === name || pkg + a.value === name || pkg + '.' + a.value === name)));
+    const tgt = al && (al.attributes || []).find(a => a.key === 'targetActivity');
+    if (!tgt) return null;
+    return tgt.value.startsWith('.') ? pkg + tgt.value : tgt.value.includes('.') ? tgt.value : pkg + '.' + tgt.value;
+  }
+  const descOf = cls => 'L' + cls.replace(/\./g, '/') + ';';
+
   async function gotoComponent(name, tag, ax) {
     const fileName = ax.eval('session && session.name');
     const dw = dexFor(fileName);
     if (!dw) return;
-    let cls = name;
-    if (tag === 'activity-alias') {
-      // alias 자체는 클래스가 아니다 — targetActivity로 간다
-      const pkg = ax.eval('last.tree.root.attributes.find(a => a.key === "package")?.value') || '';
-      const app = (ax.eval('last.tree.root.children') || []).find(c => c.tag === 'application');
-      const al = (app && app.children || []).find(c => c.tag === 'activity-alias' &&
-        (c.attributes || []).some(a => a.key === 'name' && (a.value === name || pkg + a.value === name || pkg + '.' + a.value === name)));
-      const tgt = al && (al.attributes || []).find(a => a.key === 'targetActivity');
-      if (!tgt) { toast(`${name}: activity-alias의 targetActivity를 찾지 못했습니다.`, 'warn'); return; }
-      cls = tgt.value.startsWith('.') ? pkg + tgt.value : tgt.value.includes('.') ? tgt.value : pkg + '.' + tgt.value;
-    }
-    const desc = 'L' + cls.replace(/\./g, '/') + ';';
+    const cls = componentClass(name, tag, ax);
+    if (!cls) { toast(`${name}: activity-alias의 targetActivity를 찾지 못했습니다.`, 'warn'); return; }
+    const desc = descOf(cls);
     show('dexllm');
     if (!await until(() => dw.eval('Module !== null && allClasses.length > 0'), { timeout: 60000 })) {
       toast('dexllm이 아직 분석 중입니다. 잠시 후 다시 클릭하세요.', 'warn'); return;
@@ -193,12 +198,108 @@ const Bridge = (() => {
     toast(`${perm.replace(/^android\.permission\./, '')} → dexllm permissions 패널`);
   }
 
+  // ── dexllm 근거 → axmlllm 표 (하이라이트 + evidence-first 정렬) ──
+  // Components: 구현 클래스가 dex에 있으면 hit, 없으면 miss(매니페스트에만 선언 — 패킹/동적 로딩 단서)
+  // Permissions: dex에 그 권한으로 보호되는 API 호출이 있으면 hit (API 수 · 호출 클래스 수)
+  // 배지는 ::after(attr)로만 그린다 — 셀 textContent가 그대로라 axmlllm의 복사·클릭 이동에 영향 없음.
+  let evSort = localStorage.getItem('suite.evsort') !== 'off';
+
+  async function annotateAxml(fileName, gen) {
+    let ax, dw;
+    const ready = await until(() =>
+      (ax = win('axmlllm')) && (dw = win('dexllm')) && fileOf.dexllm === fileName &&
+      ax.eval('session && session.name') === fileName &&
+      ax.document.getElementById('status').className === 'ready' &&
+      dw.document.getElementById('status').textContent.startsWith(fileName) &&
+      dw.eval('Module !== null && !permPending'), { gen, timeout: 300000 });
+    if (!ready) return;
+    const classes = dw.eval('new Set(allClasses)');
+    const permEv = JSON.parse(dw.eval(`JSON.stringify((() => {
+      const m = {};
+      for (const p of permIndex) {
+        const e = m[p.perm] || (m[p.perm] = { apis: 0, cls: new Set() });
+        e.apis++;
+        for (const c of p.callers) e.cls.add(c.split('->')[0]);
+      }
+      return Object.fromEntries(Object.entries(m).map(([k, v]) => [k, { apis: v.apis, classes: v.cls.size }]));
+    })())`));
+    const d = ax.document;
+    const rows = id => [...d.getElementById(id).rows].filter(r => r.cells[0] && r.cells[0].matches('td.mono'));
+
+    let ch = 0, ct = 0;
+    rows('comps').forEach((r, i) => {
+      const td = r.cells[0], cls = componentClass(td.textContent.trim(), (r.cells[1] || {}).textContent?.trim(), ax);
+      r.dataset.suiteIdx = i; ct++;
+      if (cls && classes.has(descOf(cls))) {
+        r.dataset.suiteEv = 'hit'; r.dataset.suiteRank = 0; ch++;
+        td.dataset.suiteBadge = cls === td.textContent.trim() ? 'dex ✓' : 'dex ✓ → ' + cls.split('.').pop();
+        td.title = 'dex에 구현 클래스가 있음 — 클릭하면 dexllm에서 연다';
+      } else {
+        r.dataset.suiteEv = 'miss'; r.dataset.suiteRank = 1;
+        td.dataset.suiteBadge = 'dex에 없음';
+        td.title = 'dex에 구현 클래스가 없음 — 매니페스트에만 선언 (패킹·동적 로딩·split APK·미사용 선언 가능성)';
+      }
+    });
+    let ph = 0, pt = 0;
+    rows('perms').forEach((r, i) => {
+      const td = r.cells[0], e = permEv[td.textContent.trim()];
+      r.dataset.suiteIdx = i; pt++;
+      if (e) {
+        r.dataset.suiteEv = 'hit'; r.dataset.suiteRank = -e.classes; ph++;
+        td.dataset.suiteBadge = `${e.apis} API · ${e.classes} class`;
+        td.title = `dex에서 이 권한으로 보호되는 API ${e.apis}개를 ${e.classes}개 클래스가 호출 — 클릭하면 dexllm permissions 패널`;
+      } else {
+        delete r.dataset.suiteEv; r.dataset.suiteRank = 1;
+        delete td.dataset.suiteBadge;
+        td.title = 'dex에서 이 권한으로 보호되는 API 호출을 찾지 못함 (선언만 됐거나 리플렉션·네이티브·동적 코드)';
+      }
+    });
+    for (const [id, hit, tot] of [['comps', ch, ct], ['perms', ph, pt]]) {
+      const c = d.getElementById('suite-evcount-' + id);
+      if (c) c.textContent = `dex 근거 ${hit}/${tot}`;
+    }
+    applySort(ax);
+  }
+
+  // evidence first: 근거 순(Components: dex에 있음 → 없음, Permissions: 호출 클래스 많은 순 → 없음), 같으면 원래 순서
+  function applySort(ax) {
+    const d = ax.document;
+    for (const id of ['comps', 'perms']) {
+      const t = d.getElementById(id);
+      const rows = [...t.rows].filter(r => r.dataset.suiteIdx !== undefined);
+      if (!rows.length) continue;
+      rows.sort((a, b) => (evSort ? (+a.dataset.suiteRank) - (+b.dataset.suiteRank) : 0) || a.dataset.suiteIdx - b.dataset.suiteIdx);
+      const body = rows[0].parentNode;
+      for (const r of rows) body.appendChild(r);
+    }
+    for (const b of d.querySelectorAll('.suite-evsort')) b.classList.toggle('on', evSort);
+  }
+
   // ── iframe 훅 ──
   const AXML_CSS = `
     #comps tr td.mono:first-child, #perms tr td.mono:first-child { cursor: pointer; }
     #comps tr td.mono:first-child:hover, #perms tr td.mono:first-child:hover {
       color: var(--brand, #a78bfa); text-decoration: underline; text-underline-offset: 3px;
     }
+    #comps tr[data-suite-ev=hit] td.mono:first-child, #perms tr[data-suite-ev=hit] td.mono:first-child {
+      color: #5fdca0; box-shadow: inset 3px 0 0 #5fdca0;
+    }
+    #comps tr[data-suite-ev=miss] td.mono:first-child { color: #f0b429; box-shadow: inset 3px 0 0 #f0b429; }
+    td.mono:first-child[data-suite-badge]::after {
+      content: attr(data-suite-badge); display: inline-block; margin-left: 10px; padding: 0 7px; border-radius: 999px;
+      font: 600 10px/1.7 var(--f-ui, sans-serif); letter-spacing: .02em; vertical-align: 1px; text-decoration: none;
+      color: #5fdca0; background: rgba(95,220,160,.12); box-shadow: inset 0 0 0 1px rgba(95,220,160,.35);
+    }
+    tr[data-suite-ev=miss] td.mono:first-child[data-suite-badge]::after {
+      color: #f0b429; background: rgba(240,180,41,.12); box-shadow: inset 0 0 0 1px rgba(240,180,41,.4);
+    }
+    .suite-evsort {
+      border: 0; cursor: pointer; border-radius: 999px; padding: 2px 9px; margin-left: 10px; vertical-align: 1px;
+      font: 600 10px/1.6 var(--f-ui, sans-serif); letter-spacing: .04em; text-transform: uppercase;
+      color: var(--fg-3, #888); background: var(--bg-1, #111); box-shadow: inset 0 0 0 1px var(--line-2, #333);
+    }
+    .suite-evsort:hover { color: var(--fg, #eee); }
+    .suite-evsort.on { color: var(--brand, #a78bfa); box-shadow: inset 0 0 0 1px var(--brand, #a78bfa); }
     .suite-hint { font-size: 11px; font-weight: 400; color: var(--fg-3, #888); margin-left: 8px; text-transform: none; letter-spacing: 0; }
   `;
   function hookAxml(w) {
@@ -211,8 +312,17 @@ const Bridge = (() => {
     for (const [id, what] of [['perms', 'dexllm permissions 패널'], ['comps', 'dexllm 클래스']]) {
       const h2 = d.getElementById(id)?.parentElement?.previousElementSibling;   // <h2> 바로 뒤 div.scroll > table
       const cnt = h2 && h2.querySelector('.muted');
-      if (cnt) cnt.insertAdjacentHTML('afterend', `<span class="suite-hint">이름 클릭 → ${what}</span>`);
+      if (cnt) cnt.insertAdjacentHTML('afterend',
+        `<button class="suite-evsort" type="button" title="dexllm 근거가 있는 행을 위로 (Components: dex에 클래스 있음, Permissions: 호출 클래스 많은 순). 끄면 매니페스트 순서">⚑ dex evidence first</button>` +
+        `<span class="suite-hint">이름 클릭 → ${what} · <span id="suite-evcount-${id}">dex 근거: dexllm 분석 후 표시</span></span>`);
     }
+    d.addEventListener('click', e => {
+      if (!e.target.closest || !e.target.closest('.suite-evsort')) return;
+      e.stopPropagation();
+      evSort = !evSort;
+      localStorage.setItem('suite.evsort', evSort ? 'on' : 'off');
+      applySort(w);
+    }, true);
     d.addEventListener('click', e => {
       if (!w.getSelection().isCollapsed) return;   // 드래그 선택은 이동하지 않음
       const td = e.target.closest && e.target.closest('#comps td.mono:first-child, #perms td.mono:first-child');
@@ -237,6 +347,10 @@ const Bridge = (() => {
       if ((name === 'axmlllm' || name === 'apkllm') && syncedGen !== gen) {
         syncedGen = gen;
         syncManifestToApk(fileName, gen);
+      }
+      if ((name === 'axmlllm' || name === 'dexllm') && annotGen !== gen) {
+        annotGen = gen;
+        annotateAxml(fileName, gen);
       }
     },
   };
