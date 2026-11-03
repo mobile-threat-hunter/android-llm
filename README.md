@@ -9,6 +9,14 @@ dexllm-web(DEX) · axmlllm-web(AXML/Manifest) · apkllm-web(APK 컨테이너)을
 (헤더의 "동시 분석"이 켜져 있으면) 나머지 도구에도 같은 파일이 열린다.
 `.dex`는 dexllm에만, 바이너리 `AndroidManifest.xml`은 axmlllm에만 들어간다.
 
+### 도구 간 연동 (`suite-bridge.js`)
+
+| 출발 | 도착 | 동작 |
+|---|---|---|
+| axmlllm 매니페스트 | apkllm Install gate | `extractNativeLibs` · `targetSdk` · base APK 여부를 자동 입력 → native lib 검사 등 판정이 unknown에서 확정값으로. 미선언 값은 플랫폼 기본값(근거 표시), 정적으로 확정 불가한 값은 unknown 유지 |
+| axmlllm Components 행 | dexllm 클래스 | 이름 클릭 → 해당 클래스 디컴파일 (activity-alias는 targetActivity). dex에 없으면 "매니페스트에만 선언됨" 경고 |
+| axmlllm Permissions 행 | dexllm permissions 패널 | 이름 클릭 → 그 권한으로 필터, gated API별 호출자 펼침, 첫 호출 클래스로 이동. dex에서 호출이 없으면 "선언만 됨" 경고 |
+
 ## 구조
 
 세 도구는 **git submodule**로 고정된다 — 이 저장소는 UI 셸(index.html)과 핀(커밋)만 가진다.
@@ -16,6 +24,7 @@ dexllm-web(DEX) · axmlllm-web(AXML/Manifest) · apkllm-web(APK 컨테이너)을
 ```
 android-llm/
 ├── index.html      # 통합 콘솔 (탭 + iframe, lazy load·상태 유지)
+├── suite-bridge.js # 도구 간 연동 (axmlllm → apkllm / dexllm)
 ├── dexllm-web/     # submodule → github.com/mobile-threat-hunter/dexllm-web
 ├── axmlllm-web/    # submodule → github.com/mobile-threat-hunter/axmlllm-web
 ├── apkllm-web/     # submodule → github.com/mobile-threat-hunter/apkllm-web

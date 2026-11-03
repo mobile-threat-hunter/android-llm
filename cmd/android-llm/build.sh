@@ -10,7 +10,7 @@ ver="${1:-$(git -C "$root" describe --tags --always)}"
 st="$here/static"
 
 rm -rf "$st"; mkdir -p "$st"
-cp "$root/index.html" "$root/versions.json" "$st/"
+cp "$root/index.html" "$root/suite-bridge.js" "$root/versions.json" "$st/"
 
 copy() {   # copy <tool> <files...> — only what the page loads at runtime
   local t="$1"; shift

@@ -141,6 +141,16 @@
   @media (max-width: 900px) { header .ver, header .file { display: none; } }
   @media (max-width: 640px) { header { gap: 8px; } nav button { padding: 0 8px; } header .brand { font-size: 13px; } }
   header .file { font-size: 12px; color: var(--text); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* 도구 간 연동 알림 (suite-bridge.js) */
+  #suite-toast {
+    position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 520px;
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.5;
+    background: var(--panel); border: 1px solid var(--accent); color: var(--text);
+    box-shadow: 0 6px 24px rgba(0,0,0,.5); cursor: pointer;
+    opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .15s, transform .15s;
+  }
+  #suite-toast.on { opacity: 1; transform: none; pointer-events: auto; }
+  #suite-toast.warn { border-color: #d29922; }
 </style>
 </head>
 <body>
@@ -197,6 +207,7 @@
   <div class="view" id="view-axmlllm" data-src="axmlllm-web/index.html"></div>
   <div class="view" id="view-apkllm" data-src="apkllm-web/index.html"></div>
 </main>
+<script src="suite-bridge.js"></script>
 <script>
   const TOOLS = ['dexllm', 'axmlllm', 'apkllm'];
   // 각 도구의 엔진 준비 여부 — 도구 페이지의 최상위 바인딩을 same-origin으로 읽는다.
@@ -270,9 +281,10 @@
     $('curfile').title = file.name;
     $('dzcur').textContent = '현재 파일: ' + file.name;
     for (const name of TOOLS) {
-      if (name === except) { dot(name, 'ok', file.name); continue; }
+      if (name === except) { dot(name, 'ok', file.name); Bridge.opened(name, file.name, my); continue; }
       if (!list.includes(name)) { dot(name, 'skip', '이 파일 형식은 해당 없음'); continue; }
       dot(name, 'busy', '로드 중…');
+      Bridge.opened(name, file.name, my);
       const f = frame(name);
       whenReady(name, f)
         .then(w => { if (my === gen) return w.loadFile(file); })
@@ -287,7 +299,11 @@
   const MAIN_DROP = { dexllm: '#drop', axmlllm: '#drop', apkllm: null /* 문서 전체 */ };
   function hookFrame(name, f) {
     const w = f.contentWindow, d = w.document;
-    const fan = file => { if ($('sync').checked && file) openAll(file, name); };
+    const fan = file => {
+      if (!file) return;
+      if ($('sync').checked) openAll(file, name);
+      else Bridge.opened(name, file.name, ++gen);   // 동시 분석 꺼짐: 이 도구만 바뀐 것으로 기록
+    };
     d.addEventListener('drop', e => {
       const sel = MAIN_DROP[name];
       if (sel && !(e.target.closest && e.target.closest(sel))) return;
@@ -296,6 +312,7 @@
     d.addEventListener('change', e => {
       if (e.target.id === 'file') fan(e.target.files && e.target.files[0]);
     }, true);
+    Bridge.hook(name, f);
   }
 
   // 셸(홈/헤더)에 드롭하거나 드롭존 클릭으로 고르면 세 도구 모두에 연다.
