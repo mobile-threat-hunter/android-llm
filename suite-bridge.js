@@ -136,9 +136,11 @@ const Bridge = (() => {
   // Components 행 → { name, tag, cls }. activity-alias는 클래스가 아니므로 cls = 그 alias가 띄우는 클래스.
   // axmlllm ≥ v0.5.1은 target_activity 열을 기기와 같은 규칙(ResID → buildClassName)으로 채워 준다 — 그 값을 쓰고,
   // 열이 없는 예전 axmlllm이면 매니페스트 트리에서 직접 푼다.
+  // axmlllm ≥ v0.6.0은 행에 data-class(기기가 인스턴스화하는 클래스)를 직접 달아 준다 — 임베딩 계약, 최우선.
   function compRow(tr, ax) {
     const name = tr.cells[0].textContent.trim();
     const tag = tr.dataset.kind || colText(tr, 'tag');
+    if (tr.dataset.class) return { name, tag, cls: tr.dataset.class };
     if (tag !== 'activity-alias') return { name, tag, cls: name };
     return { name, tag, cls: colText(tr, 'target_activity') || aliasTargetFromTree(name, ax) };
   }
