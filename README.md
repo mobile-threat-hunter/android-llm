@@ -1,9 +1,12 @@
 # Android LLM Suite
 
-dexllm-web(DEX) · axmlllm-web(AXML/Manifest) · apkllm-web(APK 컨테이너)을 한 콘솔에서 쓰는 통합 웹 페이지.
+axmlllm-web(AXML/Manifest) · dexllm-web(DEX) · apkllm-web(APK 컨테이너)을 한 콘솔에서 쓰는 통합 웹 페이지.
 
 - 웹: https://mobile-threat-hunter.github.io/android-llm/
 - Windows 로컬(오프라인): Releases의 `android-llm-<ver>-windows-amd64.exe` — [cmd/android-llm](cmd/android-llm/README.md)
+
+탭 순서: 홈 · axmlllm · dexllm · apkllm — **Ctrl+1 / 2 / 3** 으로 전환 (도구 화면 안에 포커스가 있어도 동작).
+탭을 오가도 각 화면의 스크롤 위치와 분석 상태는 그대로 유지된다.
 
 **APK 하나를 드롭하면 세 도구가 동시에 분석한다.** 홈 드롭존이나 아무 도구 탭에 드롭해도
 (헤더의 "동시 분석"이 켜져 있으면) 나머지 도구에도 같은 파일이 열린다.
