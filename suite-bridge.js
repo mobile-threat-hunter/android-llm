@@ -60,11 +60,29 @@ const Bridge = (() => {
     const app = kid(root, 'application'), sdk = kid(root, 'uses-sdk');
     const f = {};
 
-    const enl = attr(app, 'extractNativeLibs');
-    if (!enl) f.enl = { v: true, why: '미선언 → 플랫폼 기본 true' };
-    else if (enl.value === true || enl.value === false || enl.value === 'true' || enl.value === 'false')
-      f.enl = { v: String(enl.value) === 'true', why: '선언값' };
-    else f.enl = { v: null, why: `정적 확정 불가 (${enl.value})` };
+    // <manifest split="…">가 없으면 base APK. split이면 extractNativeLibs·targetSdk·isolatedSplits는
+    // base 매니페스트 값이라(apkllm docs/usage.md) 이 매니페스트만으로는 모른다 → unknown.
+    const bool = (a, dflt) => !a ? { v: dflt, why: `미선언 → 기본 ${dflt}` }
+      : (a.value === true || a.value === false || a.value === 'true' || a.value === 'false')
+        ? { v: String(a.value) === 'true', why: '선언값' }
+        : { v: null, why: `정적 확정 불가 (${a.value})` };
+    const split = attr(root, 'split');
+    const BASE = { v: null, why: 'split — base 매니페스트 값' };
+    if (split) {
+      f.role = { v: 'split', why: `split="${split.value}"` };
+      f.enl = BASE; f.tsdk = BASE; f.iso = BASE;
+      f.feat = bool(attr(root, 'isFeatureSplit'), false);
+      const cfg = attr(root, 'configForSplit');
+      f.cfg = { v: !!cfg, why: cfg ? `configForSplit="${cfg.value}"` : '미선언' };
+      return f;
+    }
+    f.role = { v: 'base', why: 'split 속성 없음' };
+    f.iso = bool(attr(root, 'isolatedSplits'), false);
+    f.feat = { v: false, why: 'base' };
+    f.cfg = { v: false, why: 'base' };
+
+    f.enl = bool(attr(app, 'extractNativeLibs'), true);
+    if (!attr(app, 'extractNativeLibs')) f.enl.why = '미선언 → 플랫폼 기본 true';
 
     const isInt = a => a && Number.isInteger(Number(a.value)) && String(a.value).trim() !== '';
     const t = attr(sdk, 'targetSdkVersion'), m = attr(sdk, 'minSdkVersion');
@@ -73,10 +91,6 @@ const Bridge = (() => {
     else if (isInt(m)) f.tsdk = { v: Number(m.value), why: '미선언 → minSdkVersion' };
     else if (m) f.tsdk = { v: null, why: `정적 확정 불가 (min ${m.value})` };
     else f.tsdk = { v: 1, why: '미선언 → 기본 1' };
-
-    // <manifest split="…">가 없으면 base APK. split이면 isolatedSplits는 base 매니페스트에 있어 여기선 모름.
-    const split = attr(root, 'split');
-    f.arsc = split ? { v: null, why: `split APK (${split.value}) — 판단 불가` } : { v: true, why: 'base APK' };
     return f;
   }
 
@@ -96,9 +110,13 @@ const Bridge = (() => {
     const set = (sel, v) => { d.querySelector(sel).value = v === null ? '' : String(v); };
     set('#in-enl', facts.enl.v);
     set('#in-tsdk', facts.tsdk.v);
-    set('#in-arsc', facts.arsc.v);
-    // gateParams()가 네 입력을 모두 읽으므로 change 한 번이면 rerunGate가 새 값으로 돈다
-    d.querySelector('#in-enl').dispatchEvent(new ap.Event('change'));
+    set('#in-role', facts.role.v);
+    set('#in-iso', facts.iso.v);
+    set('#in-feat', facts.feat.v);
+    set('#in-cfg', facts.cfg.v);
+    // gateParams()가 모든 입력을 읽으므로 change 한 번이면 rerunGate가 새 값으로 돈다.
+    // #in-tsdk의 change 핸들러는 값 검증(tsdkOk 갱신) 후 rerunGate를 부른다.
+    d.querySelector('#in-tsdk').dispatchEvent(new ap.Event('change'));
 
     const form = d.querySelector('#in-enl').closest('.form');
     let note = d.getElementById('suite-manifest-note');
@@ -111,7 +129,8 @@ const Bridge = (() => {
     }
     const show = (k, x) => `${k} = ${x.v === null ? 'unknown' : x.v} (${x.why})`;
     note.textContent = '↳ axmlllm 매니페스트에서 자동 입력 — ' +
-      [show('extractNativeLibs', facts.enl), show('targetSdk', facts.tsdk), show('base AssetManager', facts.arsc)].join(' · ') +
+      [show('extractNativeLibs', facts.enl), show('targetSdk', facts.tsdk), show('apk_role', facts.role),
+       show('isolatedSplits', facts.iso), show('feature split', facts.feat), show('configForSplit', facts.cfg)].join(' · ') +
       '. 직접 바꾸면 그 값으로 다시 계산된다.';
   }
 
@@ -142,7 +161,9 @@ const Bridge = (() => {
     const tag = tr.dataset.kind || colText(tr, 'tag');
     if (tr.dataset.class) return { name, tag, cls: tr.dataset.class };
     if (tag !== 'activity-alias') return { name, tag, cls: name };
-    return { name, tag, cls: colText(tr, 'target_activity') || aliasTargetFromTree(name, ax) };
+    // 대상을 모르는 alias는 셀에 "(unknown: …)" 메모가 들어간다 — 클래스명으로 쓰지 않는다
+    const t = colText(tr, 'target_activity');
+    return { name, tag, cls: (t && !t.startsWith('(') ? t : null) || aliasTargetFromTree(name, ax) };
   }
   function aliasTargetFromTree(name, ax) {
     const pkg = ax.eval('last.tree.root.attributes.find(a => a.key === "package")?.value') || '';
