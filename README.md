@@ -4,6 +4,8 @@ axmlllm-web(AXML/Manifest) · dexllm-web(DEX) · apkllm-web(APK 컨테이너)을
 
 - 웹: https://mobile-threat-hunter.github.io/android-llm/
 - Windows 로컬(오프라인): Releases의 `android-llm-<ver>-windows-amd64.exe` — [cmd/android-llm](cmd/android-llm/README.md)
+- MCP 서버(Claude Code · Copilot): Releases의 `android-llm-<ver>-mcp.zip` (엔진·패키지 포함) — [mcp/README.md](mcp/README.md)
+  ※ GitHub 자동 "Source code" 압축에는 엔진(서브모듈)·node 패키지가 없다.
 
 탭 순서: 홈 · axmlllm · dexllm · apkllm — **Ctrl+1 / 2 / 3** 으로 전환 (도구 화면 안에 포커스가 있어도 동작).
 탭을 오가도 각 화면의 스크롤 위치와 분석 상태는 그대로 유지된다.
@@ -49,7 +51,7 @@ Tab 자동완성(명령·`key=`), ↑↓ 기록, Ctrl+L 지우기, Esc 닫기. �
 같은 도구를 **MCP 서버**와 **CLI**로도 쓸 수 있다 — [mcp/README.md](mcp/README.md):
 
 ```bash
-cd mcp && npm install
+cd mcp && npm ci                                             # 배포 zip(mcp.zip)이면 생략
 claude mcp add android-llm -- node "$PWD/server.mjs"        # MCP (stdio)
 node cli.mjs app.apk xref_summary                            # CLI 한 번 실행 / 인자 없이 대화형
 ```

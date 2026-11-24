@@ -2,14 +2,18 @@
 // android-llm 통합 MCP 서버 (stdio) — dexllm · axmlllm · apkllm 세 엔진 + 교차 분석(xref_*).
 //   claude mcp add android-llm -- node /path/to/android-llm/mcp/server.mjs
 // 도구 정의·결과는 core/suite.mjs 하나 — 웹 콘솔 터미널(terminal.js)과 같다.
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { ListToolsRequestSchema, CallToolRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { createNodeBackend } from "./backend-node.mjs";
-import { createSuite, renderResult } from "../core/suite.mjs";
-import { startRelay, DEFAULT_PORT } from "./relay.mjs";
 import fs from "node:fs";
 import path from "node:path";
+import { preflight } from "./preflight.mjs";
+
+// 엔진(서브모듈)·node 패키지가 없으면 여기서 원인과 해결 명령을 알리고 끝낸다 — 그래서 나머지는 dynamic import
+preflight();
+const { Server } = await import("@modelcontextprotocol/sdk/server/index.js");
+const { StdioServerTransport } = await import("@modelcontextprotocol/sdk/server/stdio.js");
+const { ListToolsRequestSchema, CallToolRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } = await import("@modelcontextprotocol/sdk/types.js");
+const { createNodeBackend } = await import("./backend-node.mjs");
+const { createSuite, renderResult } = await import("../core/suite.mjs");
+const { startRelay, DEFAULT_PORT } = await import("./relay.mjs");
 
 const INSTRUCTIONS = `android-llm — 한 APK를 세 엔진으로 동시에 본다: dexllm(dex 바이트코드), axmlllm(AndroidManifest·리소스를 기기 파서대로), apkllm(ZIP 컨테이너·서명·설치 게이트).
 

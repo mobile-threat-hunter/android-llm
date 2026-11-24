@@ -5,32 +5,36 @@ dexllm · axmlllm · apkllm 세 엔진과 그 사이의 교차 분석(`xref_*`)�
 
 ## 설치·등록
 
-```bash
-git clone --recurse-submodules https://github.com/mobile-threat-hunter/android-llm
-cd android-llm/mcp && npm install        # Node ≥ 20
-claude mcp add android-llm -- node "$PWD/server.mjs"
-```
+필요한 것: [Node.js LTS](https://nodejs.org/) ≥ 20. 둘 중 하나로 받는다.
 
-### Windows
+> GitHub가 자동으로 만드는 **"Source code (zip/tar.gz)"에는 엔진 3개(서브모듈)와 node 패키지가 없다** — 그걸로는 뜨지 않는다(서버가 원인과 해결 방법을 알려 주고 끝난다).
 
-[Git for Windows](https://git-scm.com/download/win)와 [Node.js LTS](https://nodejs.org/)(≥ 20)를 설치한 뒤 PowerShell에서:
+**A. 배포 zip (권장 — git·npm 불필요, 첫 실행도 오프라인)**
+[Release](https://github.com/mobile-threat-hunter/android-llm/releases)의 `android-llm-<ver>-mcp.zip`을 받아 푼다 — 엔진 3개·node 패키지·Pyodide가 들어 있고 Windows·Linux·macOS 공용.
 
 ```powershell
-git clone --recurse-submodules https://github.com/mobile-threat-hunter/android-llm
-cd android-llm\mcp
-npm ci
+# Windows PowerShell (풀어 둔 폴더 기준)
+cd C:\tools\android-llm-v0.9.3\mcp
 claude mcp add -s user android-llm -- node "$PWD\server.mjs"
-node smoke.mjs C:\path\to\app.apk          # (선택) 세 엔진이 뜨는지 확인 — "ok — … engines ready"
+node smoke.mjs C:\path\to\app.apk     # (선택) "ok — … engines ready" 면 정상
 ```
 
-- `--recurse-submodules`를 빼먹었으면 `git submodule update --init` (세 엔진이 서브모듈에 있다).
-- 화면 연결용 콘솔은 [Release](https://github.com/mobile-threat-hunter/android-llm/releases)의 `android-llm-<ver>-windows-amd64.exe`를 실행하면 된다(`serve.sh`는 bash용). exe는 clone한 버전과 같은 태그를 쓸 것.
-- Pyodide 캐시는 `%USERPROFILE%\.cache\android-llm`. 경로는 `C:\…` 그대로 넘기면 된다(`suite_load path=C:\Users\me\app.apk`).
-- CI(`.github/workflows/mcp.yml`)가 Windows·Linux에서 이 서버를 띄워 같은 APK의 `xref_*` 결과가 같은지 확인한다.
+**B. git clone (개발·최신 main)**
+
+```bash
+git clone --recurse-submodules https://github.com/mobile-threat-hunter/android-llm
+cd android-llm/mcp && npm ci
+claude mcp add -s user android-llm -- node "$PWD/server.mjs"     # Windows: "$PWD\server.mjs"
+```
+
+- `--recurse-submodules`를 빼먹었으면 `git submodule update --init`. 이 경우 첫 실행 때 Pyodide(≈12MB)를 jsdelivr에서 받아 캐시에 둔다.
+- 화면 연결용 콘솔은 Release의 `android-llm-<ver>-windows-amd64.exe`(Windows) 또는 `./serve.sh`. MCP와 같은 버전을 쓸 것.
+- Windows 경로는 `C:\…` 그대로 넘기면 된다(`suite_load path=C:\Users\me\app.apk`). Pyodide 캐시는 `%USERPROFILE%\.cache\android-llm`.
+- CI(`.github/workflows/mcp.yml`)가 Windows·Linux에서 서버를 띄워 같은 APK의 `xref_*` 결과가 같은지, 배포 zip이 Windows에서 풀자마자 오프라인으로 뜨는지 확인한다.
 
 ### GitHub Copilot
 
-- **VS Code (Copilot Chat)**: `npm ci` 후 clone한 `android-llm` 폴더를 VS Code로 열면 저장소의 `.vscode/mcp.json`으로 서버가 잡힌다(첫 실행 때 신뢰 확인 → Start).
+- **VS Code (Copilot Chat)**: 푼(또는 clone한) `android-llm` 폴더 자체를 VS Code로 열면 저장소의 `.vscode/mcp.json`으로 서버가 잡힌다(첫 실행 때 신뢰 확인 → Start).
   Chat을 **Agent** 모드로, 도구 목록에서 `android-llm`을 켠다. 다른 폴더에서 쓰려면 사용자 설정(`MCP: Open User Configuration`)에 같은 항목을 절대 경로로 넣는다.
 - **Copilot CLI**: `/mcp add`로 넣거나 `~/.copilot/mcp-config.json`(Windows `%USERPROFILE%\.copilot\mcp-config.json`)에:
 

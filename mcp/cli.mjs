@@ -4,9 +4,12 @@
 //   node mcp/cli.mjs app.apk xref_summary       한 번 실행하고 종료
 //   node mcp/cli.mjs app.apk -e "dex_iocs" -e "xref_native"
 import readline from "node:readline";
-import { createNodeBackend } from "./backend-node.mjs";
-import { createSuite, renderResult } from "../core/suite.mjs";
-import { parseCommand, helpText } from "../core/cli.mjs";
+import { preflight } from "./preflight.mjs";
+
+preflight({ packages: false });   // CLI는 node 패키지를 쓰지 않는다 — 엔진만 확인
+const { createNodeBackend } = await import("./backend-node.mjs");
+const { createSuite, renderResult } = await import("../core/suite.mjs");
+const { parseCommand, helpText } = await import("../core/cli.mjs");
 
 const argv = process.argv.slice(2);
 const quiet = argv.includes("-q");

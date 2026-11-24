@@ -3,7 +3,7 @@ name: mcp
 on:
   push:
     branches: [main]
-    paths: ["mcp/**", "core/**", ".github/workflows/mcp.yml", "dexllm-web", "axmlllm-web", "apkllm-web"]
+    paths: ["mcp/**", "core/**", ".vscode/**", ".github/workflows/mcp.yml", "dexllm-web", "axmlllm-web", "apkllm-web"]
   workflow_dispatch:
 jobs:
   smoke:
@@ -37,5 +37,39 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          pattern: xref-*
           merge-multiple: true
       - run: diff -u xref-Linux.json xref-Windows.json && echo "Windows = Linux"
+  # 릴리즈에 붙는 배포 zip(mcp/bundle.sh)이 Windows에서 git·npm 없이 풀자마자 뜨는지
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: mcp/bundle.sh ci
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-bundle
+          path: dist/android-llm-ci-mcp.zip
+  bundle-windows:
+    needs: bundle
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/download-artifact@v4
+        with:
+          name: mcp-bundle
+      - shell: pwsh
+        run: |
+          Expand-Archive android-llm-ci-mcp.zip -DestinationPath x
+          curl.exe -sfLo test.apk https://f-droid.org/repo/org.billthefarmer.notes_142.apk
+          $env:ANDROID_LLM_CACHE = "$PWD\empty-cache"   # 번들 Pyodide만으로 떠야 한다
+          node x\android-llm-ci\mcp\smoke.mjs "$PWD\test.apk"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (Test-Path empty-cache) { Write-Error "Pyodide를 내려받았다 — 번들 Pyodide를 못 찾음"; exit 1 }

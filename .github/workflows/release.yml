@@ -24,13 +24,23 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - run: cmd/android-llm/build.sh "$TAG"
+      # MCP 배포 zip — 엔진 3개·node 패키지·Pyodide 포함 ("Source code (zip)"에는 서브모듈이 없다)
+      - run: mcp/bundle.sh "$TAG"
       - name: release
         run: |
           exe="dist/android-llm-$TAG-windows-amd64.exe"
+          mcpzip="dist/android-llm-$TAG-mcp.zip"
           notes="$(python3 -c "import json;print('\n'.join(f'- {k} {v}' for k,v in json.load(open('versions.json')).items()))")"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$exe" --clobber
+            gh release upload "$TAG" "$exe" "$mcpzip" --clobber
           else
-            gh release create "$TAG" "$exe" --title "$TAG" --notes "$(printf 'Windows: %s 실행 → 브라우저가 열림 (오프라인 동작)\n\n%s' "${exe#dist/}" "$notes")"
+            gh release create "$TAG" "$exe" "$mcpzip" --title "$TAG" --notes "$(printf '%s\n\n%s\n\n%s\n\n%s' \
+              "- 웹 콘솔 (Windows): ${exe#dist/} 실행 → 브라우저가 열림 (오프라인 동작)" \
+              "- MCP 서버 (Claude Code · Copilot, Windows/Linux/macOS): ${mcpzip#dist/} 풀고 등록 — 엔진 3개·node 패키지·Pyodide 포함, git·npm 불필요. 방법은 mcp/README.md" \
+              "※ GitHub 자동 생성 \"Source code\" 압축에는 엔진(서브모듈)과 node 패키지가 없습니다 — MCP는 위 mcp.zip을 쓰세요." \
+              "$notes")"
           fi

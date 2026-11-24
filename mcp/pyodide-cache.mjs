@@ -1,8 +1,9 @@
 // axmlllm worker.js가 CDN에서 받는 Pyodide 파일을 로컬 캐시로 돌린다.
-// 첫 실행에 한 번 받아 두면 이후는 오프라인으로 뜬다. 캐시: $ANDROID_LLM_CACHE 또는 ~/.cache/android-llm
+// 첫 실행에 한 번 받아 두면 이후는 오프라인으로 뜬다. 캐시: $ANDROID_LLM_CACHE 또는 ~/.cache/android-llm (배포 zip이면 mcp/pyodide-<ver>/ 먼저)
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const CDN = /^https:\/\/cdn\.jsdelivr\.net\/pyodide\/v([^/]+)\/full\/([^/]+)$/;
 
@@ -15,6 +16,9 @@ export async function resolvePyodideUrl(url) {
   const m = CDN.exec(url);
   if (!m) return null;
   const [, ver, file] = m;
+  // 배포 zip(bundle.sh)은 Pyodide를 mcp/pyodide-<ver>/에 같이 넣는다 — 있으면 첫 실행도 오프라인
+  const bundled = path.join(path.dirname(fileURLToPath(import.meta.url)), "pyodide-" + ver, file);
+  if (fs.existsSync(bundled)) return bundled;
   const dir = path.join(cacheRoot(), "pyodide-" + ver);
   const p = path.join(dir, file);
   if (fs.existsSync(p) && fs.statSync(p).size > 0) return p;

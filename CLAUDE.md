@@ -23,4 +23,6 @@ dexllm-web · axmlllm-web · apkllm-web 통합 웹 콘솔. 이 저장소는 **UI
   연결 중엔 MCP 호출을 브라우저 탭이 실행(같은 core) — suite_load는 바이트를 보내 셸 `openAll`로 연다. Origin·Host 루프백 검사는 빼지 말 것.
 - 웹 터미널과 Node MCP의 결과가 같아야 한다: 같은 APK로 `xref_*` 결과를 비교해 확인할 것.
 - headless Chrome 테스트 주의: 새 프로필로 막 뜬 Chrome은 시작 2~3초 구간의 fetch를 끊는다(axmlllm micropip "Failed to fetch"). 브라우저를 몇 초 띄워둔 뒤 테스트할 것 — 실사용에는 해당 없음.
+- MCP 배포 zip(`mcp/bundle.sh`, 릴리즈 CI가 첨부): git 추적 파일(서브모듈 포함) + `npm ci --omit=dev` + Pyodide(`mcp/pyodide-<ver>/`). 새 파일은 git add해야 zip에 들어간다.
+  server.mjs·cli.mjs는 `preflight.mjs`(내장 모듈만)로 엔진·패키지를 먼저 확인하고 나머지를 dynamic import한다 — 맨 위에 static import를 늘리지 말 것.
 - exe 빌드는 axmlllm-web/worker.js 사본의 Pyodide CDN base를 로컬 경로로 치환한다(build.sh). 그 문자열이 바뀌면 빌드가 실패하도록 돼 있음.
