@@ -10,7 +10,8 @@ ver="${1:-$(git -C "$root" describe --tags --always)}"
 st="$here/static"
 
 rm -rf "$st"; mkdir -p "$st"
-cp "$root/index.html" "$root/suite-bridge.js" "$root/versions.json" "$st/"
+cp "$root/index.html" "$root/suite-bridge.js" "$root/terminal.js" "$root/versions.json" "$st/"
+mkdir -p "$st/core" && cp "$root"/core/*.mjs "$st/core/"     # 웹 터미널·브리지가 쓰는 공용 도구 정의
 
 copy() {   # copy <tool> <files...> — only what the page loads at runtime
   local t="$1"; shift
@@ -18,6 +19,7 @@ copy() {   # copy <tool> <files...> — only what the page loads at runtime
   for f in "$@"; do cp "$root/$t/$f" "$st/$t/"; done
 }
 copy dexllm-web  index.html worker.js dexllm.js dexllm.wasm dexllm_logo.png
+mkdir -p "$st/dexllm-web/mcp" && cp "$root/dexllm-web/mcp/ported.mjs" "$st/dexllm-web/mcp/"   # core/suite.mjs가 import
 copy apkllm-web  index.html worker.js apkllm.js apkllm.wasm domain.js apkllm_logo.png
 copy axmlllm-web index.html worker.js axmlllm_logo.png
 cp "$root"/axmlllm-web/*.whl "$st/axmlllm-web/"

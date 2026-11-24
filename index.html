@@ -154,6 +154,54 @@
   }
   #suite-toast.on { opacity: 1; transform: none; pointer-events: auto; }
   #suite-toast.warn { border-color: #d29922; }
+  /* 웹 터미널 (terminal.js) — 통합 MCP와 같은 명령 */
+  header .termbtn {
+    appearance: none; background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    padding: 4px 9px; cursor: pointer; white-space: nowrap;
+  }
+  header .termbtn:hover, header .termbtn.active { color: var(--text); border-color: var(--accent); }
+  .term {
+    flex-shrink: 0; display: flex; flex-direction: column; position: relative;
+    background: #010409; border-top: 1px solid var(--border);
+    font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "D2Coding", monospace;
+  }
+  .term[hidden] { display: none; }
+  .term-grip { position: absolute; top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 2; }
+  body.resizing { cursor: ns-resize; user-select: none; }
+  body.resizing iframe { pointer-events: none; }
+  .term-bar {
+    display: flex; align-items: center; gap: 12px; padding: 4px 10px; flex-shrink: 0;
+    border-bottom: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 11.5px;
+  }
+  .term-bar b { color: var(--text); font-weight: 600; }
+  .term-bar .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .term-bar label { margin-left: auto; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+  .term-bar button { appearance: none; background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 0 4px; }
+  .term-bar button:hover { color: var(--text); }
+  .term-out { flex: 1; overflow: auto; padding: 6px 12px; }
+  .term-out .tb { position: relative; white-space: pre-wrap; word-break: break-all; }
+  .term-out pre { font: inherit; white-space: pre-wrap; word-break: break-all; margin: 0; }
+  .term-out .cmd { color: var(--text); margin-top: 8px; }
+  .term-out .ps, .term-in .ps { color: var(--accent); }
+  .term-out .res { color: #c9d1d9; }
+  .term-out .help { color: #c9d1d9; }
+  .term-out .head { color: var(--accent); }
+  .term-out .dim { color: var(--muted); }
+  .term-out .busy { animation: pulse 1s infinite; }
+  .term-out .err { color: #f85149; }
+  .term-out .xch { color: #d2a8ff; }
+  .term-out .tdesc { color: #7ee787; cursor: pointer; }
+  .term-out .tdesc:hover { text-decoration: underline; }
+  .term-out .tcopy {
+    position: absolute; top: 0; right: 0; appearance: none; background: var(--panel); border: 1px solid var(--border);
+    color: var(--muted); border-radius: 4px; font-size: 12px; cursor: pointer; opacity: 0; padding: 0 5px;
+  }
+  .term-out .tb:hover .tcopy { opacity: 1; }
+  .term-in { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .term-in input {
+    flex: 1; background: none; border: none; outline: none; color: var(--text); font: inherit; caret-color: var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -168,6 +216,7 @@
   <div class="file" id="curfile"></div>
   <label class="sync" title="한 도구에 파일을 열면 나머지 도구에도 같은 파일을 연다"><input type="checkbox" id="sync" checked>동시 분석</label>
   <div class="ver" id="ver"></div>
+  <button class="termbtn" id="termbtn" title="웹 터미널 — 통합 MCP와 같은 명령 (Ctrl+`)">&gt;_ 터미널</button>
 </header>
 <main>
   <div class="view active" id="view-home">
@@ -210,6 +259,17 @@
   <div class="view" id="view-axmlllm" data-src="axmlllm-web/index.html"></div>
   <div class="view" id="view-apkllm" data-src="apkllm-web/index.html"></div>
 </main>
+<div class="term" id="term" hidden>
+  <div class="term-grip" id="term-grip"></div>
+  <div class="term-bar">
+    <b>터미널</b>
+    <span class="hint">help · Tab 자동완성 · ↑↓ 기록 · Ctrl+L 지우기 · Esc 닫기 · 초록 descriptor 클릭 → dexllm</span>
+    <label title="도구 사이에 오가는 정보(suite-bridge)를 실시간으로 찍는다"><input type="checkbox" id="term-live" checked>교환 표시</label>
+    <button id="term-close" title="닫기 (Esc)">×</button>
+  </div>
+  <div class="term-out" id="term-out"></div>
+  <div class="term-in"><span class="ps">android-llm&gt;</span><input id="term-input" autocomplete="off" spellcheck="false" placeholder="xref_summary · help"></div>
+</div>
 <script src="suite-bridge.js"></script>
 <script>
   const TOOLS = ['axmlllm', 'dexllm', 'apkllm'];   // 탭 순서 = Ctrl+1/2/3
@@ -245,10 +305,15 @@
     else { document.activeElement?.blur(); window.focus(); }
   }
 
-  // Ctrl+1/2/3 → 탭 순서대로 axmlllm · dexllm · apkllm. 셸과 각 도구 iframe 문서 모두에서 받는다
+  // Ctrl+1/2/3 → 탭 순서대로 axmlllm · dexllm · apkllm, Ctrl+` → 터미널. 셸과 각 도구 iframe 문서 모두에서 받는다
   // (capture 단계라 도구 쪽 키 처리보다 먼저). 홈은 단축키 없음.
   function tabKey(e) {
     if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
+    if (e.code === 'Backquote') {
+      e.preventDefault(); e.stopPropagation();
+      window.SuiteTerminal && window.SuiteTerminal.toggle();
+      return;
+    }
     const m = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
     const name = m && TOOLS[m[1] - 1];
     if (!name) return;
@@ -361,5 +426,6 @@
       Object.entries(v).map(([k, x]) => `${k} ${x}`).join(' · ');
   }).catch(() => {});
 </script>
+<script type="module" src="terminal.js"></script>
 </body>
 </html>

@@ -8,6 +8,7 @@
 //                      dex에 없는 클래스·권한은 탭을 넘기지 않고 axmlllm에서 경고만 띄운다
 //
 // 셸(index.html)이 쓰는 진입점: Bridge.hook(name, iframe), Bridge.opened(name, fileName, gen)
+// 웹 터미널(terminal.js)이 쓰는 것: Bridge.log(교환 기록), Bridge.onExchange(fn), Bridge.fileOf(name), Bridge.toast
 const Bridge = (() => {
   const win = name => {
     const f = document.querySelector(`#view-${name} iframe`);
@@ -47,51 +48,17 @@ const Bridge = (() => {
     });
   }
 
-  // ── 매니페스트 → 사실 ──
-  // 미선언 값은 플랫폼 기본값을 쓴다 (추측이 아니라 파서 동작):
-  //   extractNativeLibs 미선언 → true (ParsingPackageUtils: bool(true, …extractNativeLibs))
-  //   targetSdkVersion 미선언 → minSdkVersion, 그것도 없으면 1
-  // 리소스 참조·코드네임처럼 정적으로 확정할 수 없는 값은 unknown으로 둔다.
-  function manifestFacts(tree) {
-    const root = tree && tree.root;
-    if (!root) return null;
-    const attr = (n, k) => n && (n.attributes || []).find(a => a.key === k);
-    const kid = (n, tag) => n && (n.children || []).find(c => c.tag === tag);
-    const app = kid(root, 'application'), sdk = kid(root, 'uses-sdk');
-    const f = {};
+  // ── 매니페스트 → 사실 ── (통합 MCP와 같은 규칙: core/facts.mjs)
+  const factsMod = import('./core/facts.mjs');
 
-    // <manifest split="…">가 없으면 base APK. split이면 extractNativeLibs·targetSdk·isolatedSplits는
-    // base 매니페스트 값이라(apkllm docs/usage.md) 이 매니페스트만으로는 모른다 → unknown.
-    const bool = (a, dflt) => !a ? { v: dflt, why: `미선언 → 기본 ${dflt}` }
-      : (a.value === true || a.value === false || a.value === 'true' || a.value === 'false')
-        ? { v: String(a.value) === 'true', why: '선언값' }
-        : { v: null, why: `정적 확정 불가 (${a.value})` };
-    const split = attr(root, 'split');
-    const BASE = { v: null, why: 'split — base 매니페스트 값' };
-    if (split) {
-      f.role = { v: 'split', why: `split="${split.value}"` };
-      f.enl = BASE; f.tsdk = BASE; f.iso = BASE;
-      f.feat = bool(attr(root, 'isFeatureSplit'), false);
-      const cfg = attr(root, 'configForSplit');
-      f.cfg = { v: !!cfg, why: cfg ? `configForSplit="${cfg.value}"` : '미선언' };
-      return f;
-    }
-    f.role = { v: 'base', why: 'split 속성 없음' };
-    f.iso = bool(attr(root, 'isolatedSplits'), false);
-    f.feat = { v: false, why: 'base' };
-    f.cfg = { v: false, why: 'base' };
-
-    f.enl = bool(attr(app, 'extractNativeLibs'), true);
-    if (!attr(app, 'extractNativeLibs')) f.enl.why = '미선언 → 플랫폼 기본 true';
-
-    const isInt = a => a && Number.isInteger(Number(a.value)) && String(a.value).trim() !== '';
-    const t = attr(sdk, 'targetSdkVersion'), m = attr(sdk, 'minSdkVersion');
-    if (isInt(t)) f.tsdk = { v: Number(t.value), why: '선언값' };
-    else if (t) f.tsdk = { v: null, why: `정적 확정 불가 (${t.value})` };
-    else if (isInt(m)) f.tsdk = { v: Number(m.value), why: '미선언 → minSdkVersion' };
-    else if (m) f.tsdk = { v: null, why: `정적 확정 불가 (min ${m.value})` };
-    else f.tsdk = { v: 1, why: '미선언 → 기본 1' };
-    return f;
+  // ── 교환 기록 — 도구 사이에 오간 정보. 웹 터미널(xref_log, 실시간 표시)이 읽는다 ──
+  const log = [];
+  const listeners = new Set();
+  function exchange(from, to, what, data) {
+    const e = { t: new Date().toISOString(), via: 'bridge', from, to, what, data };
+    log.push(e);
+    if (log.length > 500) log.splice(0, log.length - 500);
+    for (const fn of listeners) { try { fn(e); } catch (_) { /* 구독자 오류는 무시 */ } }
   }
 
   // ── axmlllm → apkllm ──
@@ -104,8 +71,10 @@ const Bridge = (() => {
       ax.document.getElementById('status').className === 'ready' &&
       ap.eval('report && report.file && report.file.name') === fileName, { gen });
     if (!ready) return;
+    const { manifestFacts, gateParams } = await factsMod;
     const facts = manifestFacts(ax.eval('last.tree'));
     if (!facts) return;
+    exchange('axmlllm', 'apkllm', 'manifest facts → Gate 입력', gateParams(facts));
     const d = ap.document;
     const set = (sel, v) => { d.querySelector(sel).value = v === null ? '' : String(v); };
     set('#in-enl', facts.enl.v);
@@ -191,6 +160,7 @@ const Bridge = (() => {
         '(패킹·동적 로딩·split APK·미사용 선언 가능성).', 'warn');
       return;
     }
+    exchange('axmlllm', 'dexllm', 'component → class', { tag, name, class: desc });
     show('dexllm');
     dw.navigateToClass(desc);
     toast(tag === 'activity-alias' ? `alias ${name} → ${cls}` : `${tag} → ${cls}`);
@@ -211,6 +181,7 @@ const Bridge = (() => {
         '선언만 됐거나 리플렉션·네이티브·동적 코드로 호출될 수 있습니다(정적 분석 범위 밖).', 'warn');
       return;
     }
+    exchange('axmlllm', 'dexllm', 'permission → permissions 패널', { perm, level });
     show('dexllm');
     const d = dw.document;
     dw.eval(`activePermLevels.add(${JSON.stringify(level)})`);   // 레벨 칩으로 숨겨져 있으면 다시 켠다
@@ -302,6 +273,8 @@ const Bridge = (() => {
       const c = d.getElementById('suite-evcount-' + id);
       if (c) c.textContent = `dex 근거 ${hit}/${tot}`;
     }
+    exchange('dexllm', 'axmlllm', 'dex 근거 → 표 하이라이트',
+      { components: `${ch}/${ct} dex에 있음`, permissions: `${ph}/${pt} 호출 근거 있음` });
     applySort(ax);
   }
 
@@ -389,7 +362,9 @@ const Bridge = (() => {
 
   return {
     toast,
-    manifestFacts,
+    log,
+    onExchange(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    fileOf: name => fileOf[name],
     hook(name, f) {
       if (name === 'axmlllm') hookAxml(f.contentWindow);
     },
