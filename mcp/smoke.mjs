@@ -28,6 +28,14 @@ const call = async (name, args = {}) => {
 const { tools } = await client.listTools();
 for (const g of ["suite_", "dex_", "axml_", "apk_", "xref_"])
   if (!tools.some(t => t.name.startsWith(g))) throw new Error(`tools/list: ${g}* 없음`);
+// Copilot 등 OpenAI 계열 클라이언트가 거부하는 도구 정의(이름 규칙·설명 1024자·items 없는 array)
+const noItems = (s) => s && typeof s === "object" && (([].concat(s.type || []).includes("array") && !s.items) ||
+  Object.values(s.properties || {}).some(noItems) || noItems(s.items));
+for (const t of tools) {
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(t.name)) throw new Error(`${t.name}: 도구 이름 규칙 위반`);
+  if ((t.description || "").length > 1024) throw new Error(`${t.name}: 설명 ${t.description.length}자 > 1024`);
+  if (noItems(t.inputSchema)) throw new Error(`${t.name}: items 없는 array 스키마`);
+}
 
 const st = await call("suite_load", { path: path.resolve(apk) });
 const bad = Object.entries(st.tools).filter(([, s]) => s.state !== "ready");

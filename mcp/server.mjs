@@ -58,7 +58,9 @@ const server = new Server({ name: "android-llm", version: "0.1.0" },
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   await be.ready();
-  return { tools: suite.list().map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })) };
+  // OpenAI 계열(Copilot 등)은 도구 설명 1024자 초과 시 요청 전체를 거부한다 — 서버에서 자른다
+  const desc = (d = "") => d.length > 1024 ? d.slice(0, 1023) + "…" : d;
+  return { tools: suite.list().map(t => ({ name: t.name, description: desc(t.description), inputSchema: t.inputSchema })) };
 });
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
