@@ -5,7 +5,7 @@
 // 파일 종류별 대상은 웹 셸(index.html targets())과 같다: ZIP → 셋 다, dex → dexllm, AXML → axmlllm.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { hostWorker } from "./workerhost.mjs";
 import { resolvePyodideUrl } from "./pyodide-cache.mjs";
 
@@ -25,7 +25,7 @@ function kindOf(b) {
 const TARGETS = { zip: ["dexllm", "axmlllm", "apkllm"], dex: ["dexllm"], axml: ["axmlllm"], unknown: [] };
 
 export async function createNodeBackend({ log = (s) => process.stderr.write(s + "\n") } = {}) {
-  const dexEngine = await import(sub("dexllm-web", "mcp/engine.mjs"));
+  const dexEngine = await import(pathToFileURL(sub("dexllm-web", "mcp/engine.mjs")).href);   // Windows: 절대 경로는 import 불가
   const state = {
     dexllm: { state: "none" }, axmlllm: { state: "none" }, apkllm: { state: "none" },
   };

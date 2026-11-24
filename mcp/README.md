@@ -11,6 +11,23 @@ cd android-llm/mcp && npm install        # Node ≥ 20
 claude mcp add android-llm -- node "$PWD/server.mjs"
 ```
 
+### Windows
+
+[Git for Windows](https://git-scm.com/download/win)와 [Node.js LTS](https://nodejs.org/)(≥ 20)를 설치한 뒤 PowerShell에서:
+
+```powershell
+git clone --recurse-submodules https://github.com/mobile-threat-hunter/android-llm
+cd android-llm\mcp
+npm ci
+claude mcp add -s user android-llm -- node "$PWD\server.mjs"
+node smoke.mjs C:\path\to\app.apk          # (선택) 세 엔진이 뜨는지 확인 — "ok — … engines ready"
+```
+
+- `--recurse-submodules`를 빼먹었으면 `git submodule update --init` (세 엔진이 서브모듈에 있다).
+- 화면 연결용 콘솔은 [Release](https://github.com/mobile-threat-hunter/android-llm/releases)의 `android-llm-<ver>-windows-amd64.exe`를 실행하면 된다(`serve.sh`는 bash용). exe는 clone한 버전과 같은 태그를 쓸 것.
+- Pyodide 캐시는 `%USERPROFILE%\.cache\android-llm`. 경로는 `C:\…` 그대로 넘기면 된다(`suite_load path=C:\Users\me\app.apk`).
+- CI(`.github/workflows/mcp.yml`)가 Windows·Linux에서 이 서버를 띄워 같은 APK의 `xref_*` 결과가 같은지 확인한다.
+
 첫 실행 때 axmlllm이 쓰는 Pyodide(약 12MB)를 jsdelivr에서 받아 `~/.cache/android-llm/pyodide-<ver>/`에 둔다
 (`ANDROID_LLM_CACHE`로 위치 변경). 이후는 오프라인으로 뜬다. 세 엔진 기동 ≈ 1초(Pyodide), 파일 한 개 로드는 크기에 따라 1~3초.
 

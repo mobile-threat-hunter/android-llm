@@ -1,0 +1,41 @@
+# MCP 서버를 Windows·Linux에서 실제로 띄워 같은 APK의 xref_* 결과가 OS와 무관하게 같은지 확인
+name: mcp
+on:
+  push:
+    branches: [main]
+    paths: ["mcp/**", "core/**", ".github/workflows/mcp.yml", "dexllm-web", "axmlllm-web", "apkllm-web"]
+  workflow_dispatch:
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: mcp
+      # 공개 오픈소스 앱(F-Droid) — 저장소에 APK를 두지 않는다
+      - run: curl -sfLo "$RUNNER_TEMP/test.apk" https://f-droid.org/repo/org.billthefarmer.notes_142.apk
+      - run: node mcp/smoke.mjs "$RUNNER_TEMP/test.apk" "xref-${{ runner.os }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xref-${{ runner.os }}
+          path: xref-${{ runner.os }}.json
+  compare:
+    needs: smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - run: diff -u xref-Linux.json xref-Windows.json && echo "Windows = Linux"

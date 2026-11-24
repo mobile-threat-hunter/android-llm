@@ -4,12 +4,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 // url → 로컬 파일 경로. 상대 URL은 worker.js 디렉터리 기준, 절대 URL은 resolveUrl 훅이 정한다.
 function makeResolver(dir, resolveUrl) {
   return async (url) => {
     const u = String(url).split(/[?#]/)[0];
-    if (u.startsWith("file://")) return decodeURIComponent(new URL(u).pathname);
+    if (u.startsWith("file://")) return fileURLToPath(u);   // Windows: file:///C:/… → C:\…
     if (/^[a-z]+:\/\//i.test(u)) {
       const p = resolveUrl ? await resolveUrl(u) : null;
       if (!p) throw new Error(`worker host: no local mapping for ${u}`);
@@ -31,7 +32,7 @@ export function hostWorker(workerFile, { resolveUrl, log = () => {} } = {}) {
     TextEncoder, TextDecoder, URL, URLSearchParams, atob, btoa, Blob, Response, Headers,
     crypto: globalThis.crypto, performance, structuredClone,
   };
-  ctx.location = new URL("file://" + workerFile);   // Pyodide: new URL(x, location)
+  ctx.location = pathToFileURL(workerFile);   // Pyodide: new URL(x, location)
   ctx.postMessage = (data) => {
     if (data && data.id != null && pending.has(data.id) && ("ok" in data)) {
       const p = pending.get(data.id);
