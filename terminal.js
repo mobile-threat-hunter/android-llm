@@ -48,7 +48,22 @@ const be = {
   token: () => [curName(), idOf(peek('dexllm', 'dk')), idOf(peek('axmlllm', 'session')), idOf(peek('apkllm', 'report'))].join('|'),
   tools: () => Object.fromEntries(TOOLS.map(n => [n, toolState(n)])),
   versions: () => versions,
-  async load() {
+  async load(a = {}) {
+    // MCP 중계가 보낸 파일(바이트) — 화면에 연다(홈 드롭과 같은 openAll)
+    if (a.bytes_b64) {
+      const bytes = Uint8Array.fromBase64 ? Uint8Array.fromBase64(a.bytes_b64)
+        : new Uint8Array(await (await fetch('data:application/octet-stream;base64,' + a.bytes_b64)).arrayBuffer());
+      const file = new File([bytes], a.name || 'input.apk');
+      const list = await openAll(file);
+      if (!document.querySelector('.view.active[data-src]')) show(list[0]);
+      const t0 = Date.now();   // 대상 도구가 다 끝날 때까지 (준비 또는 오류)
+      while (Date.now() - t0 < 300000) {
+        const st = be.tools();
+        if (list.every(n => st[n].state === 'ready' || st[n].state === 'error')) break;
+        await new Promise(r => setTimeout(r, 300));
+      }
+      return { file: be.file(), tools: be.tools() };
+    }
     $('suitefile').click();
     return { note: '파일 선택 창을 열었습니다 — 고른 파일이 세 도구에 동시에 열립니다. 로드가 끝나면 suite_status로 확인.' };
   },
@@ -63,6 +78,7 @@ const be = {
   apkReport: () => need('apkllm').eval('report'),
   apk: (msg) => need('apkllm').wcall(msg),
 };
+be.ui = { openClass: (c) => gotoClass(c), showTab: (t) => show(t) };
 const suite = createSuite(be);
 
 // ── UI ──
@@ -220,5 +236,57 @@ $('term-grip').addEventListener('pointerdown', (e) => {
   };
   addEventListener('pointermove', move); addEventListener('pointerup', up);
 });
+
+// ── MCP 중계 (mcp/relay.mjs) — 로컬에서 연 콘솔만. 붙어 있는 동안 MCP 도구 호출을 이 탭이 실행한다 ──
+const LOCAL = /^(127\.0\.0\.1|localhost|\[::1\])$/.test(location.hostname);
+const RELAY_PORT = Number(new URLSearchParams(location.search).get('mcp')) || 47361;
+const badge = $('mcpstat');
+let ws = null, wsDelay = 2000, lastHello = '';
+function setBadge(on, title) { badge.hidden = !LOCAL; badge.classList.toggle('on', on); badge.title = title; }
+function hello(force) {
+  if (!ws || ws.readyState !== 1) return;
+  const h = JSON.stringify({ type: 'hello', file: be.file(), tools: be.tools(), versions });
+  if (force || h !== lastHello) { lastHello = h; ws.send(h); }
+}
+function connect() {
+  try { ws = new WebSocket(`ws://127.0.0.1:${RELAY_PORT}`); } catch (_) { return retry(); }
+  ws.onopen = () => {
+    wsDelay = 2000; lastHello = '';
+    setBadge(true, `MCP 연결됨 (ws://127.0.0.1:${RELAY_PORT}) — MCP 도구 호출을 이 탭이 실행하고 터미널에 표시`);
+    hello(true);
+    line(`⇄ MCP 연결됨 — 이제 Claude(MCP)의 도구 호출을 이 탭이 실행합니다`, 'mcp');
+  };
+  ws.onmessage = async (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
+    if (m.type !== 'call') return;
+    const shownArgs = m.name === 'suite_load' ? { name: m.args.name, bytes: Math.round(m.args.bytes_b64.length * 3 / 4) } : m.args;
+    block('cmd mcp', `<span class="ps">mcp&gt;</span> ${esc(m.name)} ${esc(Object.keys(shownArgs || {}).length ? JSON.stringify(shownArgs) : '')}`);
+    badge.classList.add('busy');
+    const t0 = performance.now();
+    try {
+      const r = await suite.call(m.name, m.args || {});
+      ws.send(JSON.stringify({ type: 'result', id: m.id, ok: true, result: r }));
+      print(renderResult(r));
+      line(`(mcp ${m.name} ${Math.round(performance.now() - t0)}ms)`, 'dim');
+    } catch (e) {
+      const msg = String(e && e.message || e);
+      ws.send(JSON.stringify({ type: 'result', id: m.id, ok: false, error: msg }));
+      line('error: ' + msg, 'err');
+    } finally { badge.classList.remove('busy'); hello(); }
+  };
+  ws.onclose = () => {
+    if (badge.classList.contains('on')) line('⇄ MCP 연결 끊김 — 다시 연결을 기다립니다', 'mcp');
+    setBadge(false, `MCP 대기 중 — android-llm MCP 서버가 뜨면 자동 연결 (ws://127.0.0.1:${RELAY_PORT})`);
+    ws = null; retry();
+  };
+}
+function retry() { setTimeout(connect, wsDelay); wsDelay = Math.min(wsDelay * 1.5, 10000); }
+if (LOCAL) {
+  setBadge(false, `MCP 대기 중 — android-llm MCP 서버가 뜨면 자동 연결 (ws://127.0.0.1:${RELAY_PORT})`);
+  connect();
+  setInterval(() => hello(), 2000);   // 파일·상태가 바뀌면 MCP 쪽 상태도 갱신
+  addEventListener('focus', () => ws && ws.readyState === 1 && ws.send('{"type":"focus"}'));
+}
+badge.addEventListener('click', () => toggle(true));
 
 window.SuiteTerminal = { toggle, run, suite };

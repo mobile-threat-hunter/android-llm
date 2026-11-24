@@ -14,6 +14,17 @@ claude mcp add android-llm -- node "$PWD/server.mjs"
 첫 실행 때 axmlllm이 쓰는 Pyodide(약 12MB)를 jsdelivr에서 받아 `~/.cache/android-llm/pyodide-<ver>/`에 둔다
 (`ANDROID_LLM_CACHE`로 위치 변경). 이후는 오프라인으로 뜬다. 세 엔진 기동 ≈ 1초(Pyodide), 파일 한 개 로드는 크기에 따라 1~3초.
 
+## 웹 콘솔 연결
+
+MCP 서버는 `ws://127.0.0.1:47361`에 중계를 연다. 로컬에서 연 통합 콘솔(exe·`serve.sh`)이 자동으로 붙고(헤더 **MCP** 배지),
+붙어 있는 동안 모든 도구 호출을 **그 브라우저 탭이 실행**한다 — 분석가가 연 파일·화면 상태를 그대로 쓰고, 호출·결과는 콘솔 터미널에 `mcp>`로 찍힌다.
+`suite_load path=…`는 파일 바이트를 보내 그 화면에 열고(Node 쪽에도 같이 열어 둠), `ui_open_class` / `ui_show_tab`은 화면을 움직인다.
+탭이 없으면 Node 엔진으로 실행(`suite_status` → `executor`). 같은 APK면 브라우저·Node의 분석 결과는 같다.
+
+- 보안: 127.0.0.1 바인드, Host·Origin이 루프백일 때만 수락(다른 사이트·DNS rebinding 거부). 분석 도구 호출만 오간다.
+- 여러 탭이면 마지막에 포커스한 탭이 실행한다. 두 번째 MCP 프로세스는 포트가 겹쳐 중계 없이 Node로만 동작한다.
+- 환경 변수: `ANDROID_LLM_BRIDGE=off`(중계 끄기), `ANDROID_LLM_BRIDGE_PORT`(콘솔은 URL `?mcp=<port>`).
+
 ## CLI
 
 ```bash
@@ -39,6 +50,7 @@ node cli.mjs app.apk -e xref_native -e "dex_iocs" -q   # 여러 명령, -q = 진
 | `xref_native` | apkllm ↔ dexllm: lib/<abi>/*.so 와 lib/ 밖 ELF, 그 이름을 참조하는 dex 메서드, loadLibrary/load 호출자 |
 | `xref_summary` | 세 도구 신호 + 위 교차 결과 개수 |
 | `xref_log` | 이 세션에서 도구 사이에 오간 정보 기록 |
+| `ui_open_class` / `ui_show_tab` | 연결된 웹 콘솔 화면에서 클래스 열기 / 탭 전환 |
 
 프롬프트 `triage_apk`(path)는 이 흐름(요약 → 교차 결과 → 근거 확인 → 보고)을 한 번에 건다.
 
@@ -46,6 +58,7 @@ node cli.mjs app.apk -e xref_native -e "dex_iocs" -q   # 여러 명령, -q = 진
 
 - `backend-node.mjs` — 엔진: dexllm은 `dexllm-web/mcp/engine.mjs`, axmlllm·apkllm은 각 저장소의 **worker.js를 그대로** `workerhost.mjs`(vm 기반 최소 Web Worker 호스트)에서 돌린다. 웹 페이지와 같은 파일·같은 메시지 프로토콜.
 - `pyodide-cache.mjs` — axmlllm worker.js가 CDN에서 받는 Pyodide 파일을 로컬 캐시로 돌린다.
+- `relay.mjs` — 웹 콘솔 중계(WebSocket, 루프백 전용).
 - `server.mjs` — MCP stdio (도구 목록은 core에서, axml_*는 엔진이 내보내는 목록).
 - `cli.mjs` — 같은 도구의 명령줄.
 

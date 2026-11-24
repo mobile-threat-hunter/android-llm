@@ -19,6 +19,8 @@ dexllm-web · axmlllm-web · apkllm-web 통합 웹 콘솔. 이 저장소는 **UI
   의존하는 도구 쪽 이름 — dexllm: `dexllm-web/mcp/engine.mjs`·`ported.mjs`(import), 페이지 `dk`·`wcall`(`decompile`/`extractIocs`),
   axmlllm: worker.js 메시지 `init/open/tool/tree/components/classnames`, worker 최상위 `py`(Node에서 TOOL_DEFINITIONS 읽기), 페이지 `session.tools`·`wcall`,
   apkllm: worker.js 메시지 `init/load/gate`, 페이지 `report`·`wcall`. Node에서는 axmlllm·apkllm의 worker.js를 그대로 vm에서 돌린다(mcp/workerhost.mjs).
+- MCP ↔ 웹 콘솔 중계: MCP 서버가 ws://127.0.0.1:47361(mcp/relay.mjs)을 열고, 로컬에서 연 콘솔(terminal.js, hostname이 루프백일 때만)이 붙는다.
+  연결 중엔 MCP 호출을 브라우저 탭이 실행(같은 core) — suite_load는 바이트를 보내 셸 `openAll`로 연다. Origin·Host 루프백 검사는 빼지 말 것.
 - 웹 터미널과 Node MCP의 결과가 같아야 한다: 같은 APK로 `xref_*` 결과를 비교해 확인할 것.
 - headless Chrome 테스트 주의: 새 프로필로 막 뜬 Chrome은 시작 2~3초 구간의 fetch를 끊는다(axmlllm micropip "Failed to fetch"). 브라우저를 몇 초 띄워둔 뒤 테스트할 것 — 실사용에는 해당 없음.
 - exe 빌드는 axmlllm-web/worker.js 사본의 Pyodide CDN base를 로컬 경로로 치환한다(build.sh). 그 문자열이 바뀌면 빌드가 실패하도록 돼 있음.

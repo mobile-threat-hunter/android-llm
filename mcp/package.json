@@ -4,9 +4,15 @@
   "private": true,
   "type": "module",
   "description": "stdio MCP server + CLI over dexllm · axmlllm · apkllm (the submodules' web engines) with cross-tool xref tools",
-  "bin": { "android-llm-mcp": "server.mjs", "android-llm": "cli.mjs" },
-  "engines": { "node": ">=20" },
+  "bin": {
+    "android-llm-mcp": "server.mjs",
+    "android-llm": "cli.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.0"
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "ws": "^8.23.0"
   }
 }

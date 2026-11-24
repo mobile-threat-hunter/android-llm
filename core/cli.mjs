@@ -81,7 +81,7 @@ export function parseCommand(tools, line) {
   return { name, args };
 }
 
-const GROUP_TITLE = { suite: "세션", dex: "dexllm (dex 바이트코드)", axml: "axmlllm (매니페스트·리소스)", apk: "apkllm (컨테이너·서명·설치 게이트)", xref: "교차 분석 (도구 사이에 주고받는 정보)" };
+const GROUP_TITLE = { suite: "세션", dex: "dexllm (dex 바이트코드)", axml: "axmlllm (매니페스트·리소스)", apk: "apkllm (컨테이너·서명·설치 게이트)", xref: "교차 분석 (도구 사이에 주고받는 정보)", ui: "웹 콘솔 화면 (브라우저 탭이 실행할 때)" };
 
 export function helpText(tools, name) {
   if (name) {
@@ -100,7 +100,7 @@ export function helpText(tools, name) {
     return lines.join("\n");
   }
   const lines = [];
-  for (const g of ["suite", "xref", "dex", "axml", "apk"]) {
+  for (const g of ["suite", "xref", "dex", "axml", "apk", "ui"]) {
     const ts = tools.filter(t => t.group === g);
     if (!ts.length) continue;
     lines.push(`■ ${GROUP_TITLE[g]}`);

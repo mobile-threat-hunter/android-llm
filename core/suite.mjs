@@ -169,9 +169,16 @@ export function createSuite(be) {
   }));
   def("suite_load", "suite",
     "APK(또는 dex / 바이너리 AndroidManifest.xml)를 세 도구에 한 번에 연다. 이전 세션은 초기화된다. " +
-    "웹 터미널에서는 path 없이 부르면 파일 선택 창이 열린다.",
+    "MCP가 웹 콘솔에 연결돼 있으면 그 화면에 열린다. 웹 터미널에서는 path 없이 부르면 파일 선택 창이 열린다.",
     { path: str("로컬 파일 절대 경로 (MCP·CLI)") },
     async (a) => be.load(a), be.kind === "node" ? ["path"] : undefined);
+
+  // ui — 브라우저 탭이 실행할 때만 (MCP가 웹 콘솔에 연결됐을 때 화면을 같이 움직인다)
+  const ui = () => { if (!be.ui) throw new Error("ui_* 는 웹 콘솔 탭이 실행할 때만 — 로컬 콘솔(exe·serve.sh)을 열어 MCP에 연결하세요"); return be.ui; };
+  def("ui_open_class", "ui", "웹 콘솔의 dexllm 탭에서 클래스를 연다(디컴파일 화면으로 이동). 분석가에게 근거 코드를 보여줄 때.",
+    { class_desc: str("class/method descriptor 또는 FQN") }, async ({ class_desc }) => ({ opened: ui().openClass(class_desc) }), ["class_desc"]);
+  def("ui_show_tab", "ui", "웹 콘솔 탭 전환: home · axmlllm · dexllm · apkllm.",
+    { tab: { type: "string", enum: ["home", "axmlllm", "dexllm", "apkllm"] } }, async ({ tab }) => { ui().showTab(tab); return { tab }; }, ["tab"]);
 
   // dex — dexllm MCP(dexllm-web/mcp/server.mjs)와 같은 의미·같은 엔진 호출
   def("dex_list_classes", "dex", "dex 클래스 descriptor 목록(페이지)." + DEX_ONLY,
@@ -489,14 +496,15 @@ export function createSuite(be) {
       inputSchema: d.input_schema || { type: "object", properties: {} }, run: (a) => axTool(d.name, a) }));
   }
 
-  const list = () => [...T.filter(t => t.group !== "dex" && t.group !== "apk" && t.group !== "xref"),
-    ...T.filter(t => t.group === "dex"), ...axmlDefs(), ...T.filter(t => t.group === "apk"), ...T.filter(t => t.group === "xref")];
+  const list = () => [...T.filter(t => t.group === "suite"), ...T.filter(t => t.group === "dex"), ...axmlDefs(),
+    ...T.filter(t => t.group === "apk"), ...T.filter(t => t.group === "xref"), ...T.filter(t => t.group === "ui")];
 
   return {
     list,
     find: (name) => list().find(t => t.name === name),
     async call(name, args = {}) {
       const t = list().find(x => x.name === name);
+      if (!t && name.startsWith("axml_")) throw new Error(`${name}: axmlllm 세션이 없습니다 — 파일을 먼저 여세요 (axml_* 목록은 엔진이 파일을 연 뒤에 정해진다)`);
       if (!t) throw new Error(`unknown tool: ${name}`);
       return t.run(args || {});
     },

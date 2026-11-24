@@ -54,6 +54,20 @@ claude mcp add android-llm -- node "$PWD/server.mjs"        # MCP (stdio)
 node cli.mjs app.apk xref_summary                            # CLI 한 번 실행 / 인자 없이 대화형
 ```
 
+### Claude(MCP) ↔ 웹 콘솔 연결
+
+**로컬에서 연 콘솔**(Windows exe 또는 `./serve.sh`)은 통합 MCP 서버에 자동으로 붙는다 — 헤더의 **MCP** 배지가 초록이면 연결됨.
+연결돼 있는 동안 Claude의 MCP 도구 호출은 **그 브라우저 탭이 실행**한다:
+
+- 분석가가 화면에 연 파일·상태(dexllm dump 추가 등)를 Claude가 그대로 다룬다. `suite_load path=…`는 파일을 이 화면에 연다.
+- 호출과 결과가 콘솔 터미널에 `mcp>` 로 찍힌다 — Claude가 무엇을 보고 판단했는지 그 자리에서 보인다.
+- `ui_open_class` · `ui_show_tab` 으로 Claude가 근거 코드를 dexllm 화면에 띄운다.
+- 탭을 닫으면 MCP는 Node 엔진으로 이어서 동작한다(`suite_status`의 `executor`: browser / node).
+
+중계는 MCP 서버가 `ws://127.0.0.1:47361`에 연다 — 루프백 Host·루프백 Origin 페이지만 받고(다른 웹사이트·DNS rebinding 차단),
+오가는 것은 분석 도구 호출뿐이다. GitHub Pages 콘솔은 연결하지 않는다. 포트 변경: MCP `ANDROID_LLM_BRIDGE_PORT` + 콘솔 URL `?mcp=<port>`,
+끄기: `ANDROID_LLM_BRIDGE=off`.
+
 ## 구조
 
 세 도구는 **git submodule**로 고정된다 — 이 저장소는 UI 셸(index.html)과 핀(커밋)만 가진다.

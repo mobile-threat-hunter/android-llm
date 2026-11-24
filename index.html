@@ -161,6 +161,18 @@
     padding: 4px 9px; cursor: pointer; white-space: nowrap;
   }
   header .termbtn:hover, header .termbtn.active { color: var(--text); border-color: var(--accent); }
+  header .mcpstat {
+    font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); cursor: pointer;
+    border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px 2px 18px; position: relative; white-space: nowrap;
+  }
+  header .mcpstat::before {
+    content: ""; position: absolute; left: 7px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--border);
+  }
+  header .mcpstat.on { color: var(--text); border-color: #3fb95066; }
+  header .mcpstat.on::before { background: #3fb950; }
+  header .mcpstat.busy::before { background: #d2a8ff; animation: pulse .6s infinite; }
+  .term-out .mcp { color: #d2a8ff; }
+  .term-out .cmd.mcp .ps { color: #d2a8ff; }
   .term {
     flex-shrink: 0; display: flex; flex-direction: column; position: relative;
     background: #010409; border-top: 1px solid var(--border);
@@ -216,6 +228,7 @@
   <div class="file" id="curfile"></div>
   <label class="sync" title="한 도구에 파일을 열면 나머지 도구에도 같은 파일을 연다"><input type="checkbox" id="sync" checked>동시 분석</label>
   <div class="ver" id="ver"></div>
+  <span class="mcpstat" id="mcpstat" hidden>MCP</span>
   <button class="termbtn" id="termbtn" title="웹 터미널 — 통합 MCP와 같은 명령 (Ctrl+`)">&gt;_ 터미널</button>
 </header>
 <main>

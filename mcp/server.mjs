@@ -7,19 +7,52 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema, ListPromptsRequestSchema, GetPromptRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { createNodeBackend } from "./backend-node.mjs";
 import { createSuite, renderResult } from "../core/suite.mjs";
+import { startRelay, DEFAULT_PORT } from "./relay.mjs";
+import fs from "node:fs";
+import path from "node:path";
 
 const INSTRUCTIONS = `android-llm — 한 APK를 세 엔진으로 동시에 본다: dexllm(dex 바이트코드), axmlllm(AndroidManifest·리소스를 기기 파서대로), apkllm(ZIP 컨테이너·서명·설치 게이트).
+
+로컬 웹 콘솔(exe·serve.sh)이 열려 있으면 모든 호출은 그 브라우저 탭이 실행한다 — 분석가가 연 파일·화면 상태를 그대로 다루고, 호출과 결과가 콘솔 터미널에 보인다. suite_status의 executor로 확인(browser / node).
 
 흐름: suite_load path=<apk> → xref_summary(세 도구 신호 + 교차 결과 요약) → 신호가 가리키는 쪽으로 좁힌다.
 - dex_* : 코드에서 나온 사실(호출·문자열·IoC). 매니페스트를 모른다.
 - axml_* : 기기가 실제로 읽는 매니페스트(선언 컴포넌트·권한·이상 징후·리소스).
 - apk_* : 컨테이너 사실(변조 검사, 서명 블록·인증서, 엔트리 내용 분류, 설치 게이트).
+- ui_* : 웹 콘솔 화면을 움직인다(클래스 열기·탭 전환) — 분석가가 로컬 콘솔을 열어 이 MCP에 연결했을 때만.
 - xref_* : 도구 사이에 주고받는 정보 — 매니페스트 값→설치 게이트(xref_manifest_gate), 선언 컴포넌트↔dex 클래스(xref_components), 선언 권한↔호출 근거(xref_permissions), 포장된 .so↔로더(xref_native), 교환 기록(xref_log).
 
 판단 규칙: 정적 분석은 실행을 증명하지 않는다. 선언됐지만 dex에 없는 컴포넌트, 선언 없이 호출되는 권한 API, 포장 라이브러리를 참조하지 않는 로더는 '단서'로 보고 해당 dex_* 도구로 근거를 확인한 뒤 결론을 낸다. 결과가 크면 limit/offset/필터로 좁힌다(응답 상한 200k자).`;
 
 const be = await createNodeBackend();
 const suite = createSuite(be);
+
+// 로컬 웹 콘솔(exe·serve.sh)이 중계에 붙어 있으면 도구 호출을 그 브라우저 탭이 실행한다 —
+// 분석가가 보는 화면·세션과 같은 것을 다루고, 호출과 결과가 그 탭의 터미널에 찍힌다.
+// 탭이 없으면 Node 엔진(be)으로. ANDROID_LLM_BRIDGE=off 로 중계를 끈다.
+const relay = process.env.ANDROID_LLM_BRIDGE === "off" ? null
+  : startRelay({ port: Number(process.env.ANDROID_LLM_BRIDGE_PORT) || DEFAULT_PORT, log: (s) => process.stderr.write(s + "\n") });
+const bridgeInfo = () => relay ? relay.info() : { relay: null, disabled: "ANDROID_LLM_BRIDGE=off" };
+
+async function dispatch(name, args) {
+  if (!relay || !relay.connected()) {
+    const r = await suite.call(name, args);
+    if (name === "suite_status") return { ...r, executor: "node", bridge: bridgeInfo() };
+    return r;
+  }
+  if (name === "suite_load") {
+    // 브라우저는 로컬 경로를 못 읽는다 — 바이트를 보내 화면에 연다. Node 쪽에도 같이 열어 탭이 닫혀도 이어서 쓴다.
+    const abs = path.resolve(args.path || "");
+    const bytes = fs.readFileSync(abs);
+    const nodeLoad = suite.call("suite_load", { path: abs }).catch((e) => ({ error: String(e.message || e) }));
+    const r = await relay.call("suite_load", { name: path.basename(abs), bytes_b64: bytes.toString("base64") });
+    await nodeLoad;
+    return { ...r, executor: "browser" };
+  }
+  const r = await relay.call(name, args);
+  if (name === "suite_status") return { ...r, executor: "browser", bridge: bridgeInfo() };
+  return r;
+}
 const server = new Server({ name: "android-llm", version: "0.1.0" },
   { capabilities: { tools: { listChanged: true }, prompts: {} }, instructions: INSTRUCTIONS });
 
@@ -30,7 +63,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     await be.ready();
-    const r = await suite.call(req.params.name, req.params.arguments || {});
+    const r = await dispatch(req.params.name, req.params.arguments || {});
     return { content: [{ type: "text", text: renderResult(r) }] };
   } catch (e) {
     return { isError: true, content: [{ type: "text", text: String(e && e.message || e) }] };
