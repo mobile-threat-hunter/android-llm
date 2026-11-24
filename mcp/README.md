@@ -28,6 +28,18 @@ node smoke.mjs C:\path\to\app.apk          # (선택) 세 엔진이 뜨는지 �
 - Pyodide 캐시는 `%USERPROFILE%\.cache\android-llm`. 경로는 `C:\…` 그대로 넘기면 된다(`suite_load path=C:\Users\me\app.apk`).
 - CI(`.github/workflows/mcp.yml`)가 Windows·Linux에서 이 서버를 띄워 같은 APK의 `xref_*` 결과가 같은지 확인한다.
 
+### GitHub Copilot
+
+- **VS Code (Copilot Chat)**: `npm ci` 후 clone한 `android-llm` 폴더를 VS Code로 열면 저장소의 `.vscode/mcp.json`으로 서버가 잡힌다(첫 실행 때 신뢰 확인 → Start).
+  Chat을 **Agent** 모드로, 도구 목록에서 `android-llm`을 켠다. 다른 폴더에서 쓰려면 사용자 설정(`MCP: Open User Configuration`)에 같은 항목을 절대 경로로 넣는다.
+- **Copilot CLI**: `/mcp add`로 넣거나 `~/.copilot/mcp-config.json`(Windows `%USERPROFILE%\.copilot\mcp-config.json`)에:
+
+```json
+{ "mcpServers": { "android-llm": { "type": "local", "command": "node", "args": ["C:\\path\\to\\android-llm\\mcp\\server.mjs"], "tools": ["*"] } } }
+```
+
+Claude Code와 Copilot을 같이 띄우면 서버가 둘이 된다 — 47361 중계(화면 연결)는 먼저 뜬 쪽만 쓰고, 나머지는 Node 엔진으로 동작한다.
+
 첫 실행 때 axmlllm이 쓰는 Pyodide(약 12MB)를 jsdelivr에서 받아 `~/.cache/android-llm/pyodide-<ver>/`에 둔다
 (`ANDROID_LLM_CACHE`로 위치 변경). 이후는 오프라인으로 뜬다. 세 엔진 기동 ≈ 1초(Pyodide), 파일 한 개 로드는 크기에 따라 1~3초.
 
