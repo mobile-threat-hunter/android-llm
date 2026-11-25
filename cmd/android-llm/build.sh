@@ -10,7 +10,7 @@ ver="${1:-$(git -C "$root" describe --tags --always)}"
 st="$here/static"
 
 rm -rf "$st"; mkdir -p "$st"
-cp "$root/index.html" "$root/suite-bridge.js" "$root/terminal.js" "$root/versions.json" "$st/"
+cp "$root/index.html" "$root/theme.js" "$root/suite-bridge.js" "$root/terminal.js" "$root/versions.json" "$st/"
 mkdir -p "$st/core" && cp "$root"/core/*.mjs "$st/core/"     # 웹 터미널·브리지가 쓰는 공용 도구 정의
 
 copy() {   # copy <tool> <files...> — only what the page loads at runtime

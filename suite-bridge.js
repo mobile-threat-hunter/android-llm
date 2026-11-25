@@ -303,11 +303,11 @@ const Bridge = (() => {
       color: var(--brand, #a78bfa); text-decoration: underline; text-underline-offset: 3px;
     }
     #comps tr[data-suite-ev=hit] td.mono:first-child, #perms tr[data-suite-ev=hit] td.mono:first-child {
-      color: #5fdca0; box-shadow: inset 3px 0 0 #5fdca0;
+      color: var(--good, #5fdca0); box-shadow: inset 3px 0 0 var(--good, #5fdca0);
     }
-    #comps tr[data-suite-ev=miss] td.mono:first-child { color: #f0b429; box-shadow: inset 3px 0 0 #f0b429; }
-    #comps tr[data-suite-ev=hit] td.suite-target { color: #5fdca0; }
-    #comps tr[data-suite-ev=miss] td.suite-target { color: #f0b429; }
+    #comps tr[data-suite-ev=miss] td.mono:first-child { color: var(--warn, #f0b429); box-shadow: inset 3px 0 0 var(--warn, #f0b429); }
+    #comps tr[data-suite-ev=hit] td.suite-target { color: var(--good, #5fdca0); }
+    #comps tr[data-suite-ev=miss] td.suite-target { color: var(--warn, #f0b429); }
     /* 근거가 확인된 뒤 dex에 없는 행은 이동하지 않는다 — 클릭 가능해 보이지 않게 */
     #comps tr[data-suite-ev=miss] td.mono:first-child, #perms tr[data-suite-idx]:not([data-suite-ev]) td.mono:first-child {
       cursor: help; text-decoration: none !important;
@@ -316,10 +316,10 @@ const Bridge = (() => {
     td.mono:first-child[data-suite-badge]::after {
       content: attr(data-suite-badge); display: inline-block; margin-left: 10px; padding: 0 7px; border-radius: 999px;
       font: 600 10px/1.7 var(--f-ui, sans-serif); letter-spacing: .02em; vertical-align: 1px; text-decoration: none;
-      color: #5fdca0; background: rgba(95,220,160,.12); box-shadow: inset 0 0 0 1px rgba(95,220,160,.35);
+      color: var(--good, #5fdca0); background: color-mix(in srgb, var(--good, #5fdca0) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--good, #5fdca0) 35%, transparent);
     }
     tr[data-suite-ev=miss] td.mono:first-child[data-suite-badge]::after {
-      color: #f0b429; background: rgba(240,180,41,.12); box-shadow: inset 0 0 0 1px rgba(240,180,41,.4);
+      color: var(--warn, #f0b429); background: color-mix(in srgb, var(--warn, #f0b429) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn, #f0b429) 40%, transparent);
     }
     .suite-evsort {
       border: 0; cursor: pointer; border-radius: 999px; padding: 2px 9px; margin-left: 10px; vertical-align: 1px;

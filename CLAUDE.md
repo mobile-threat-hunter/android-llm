@@ -14,6 +14,9 @@ dexllm-web · axmlllm-web · apkllm-web 통합 웹 콘솔. 이 저장소는 **UI
   dexllm `navigateToClass`·`allClasses`·`permIndex`·`permPending`·`permTab`·`activePermLevels`·`renderPermPanel`·`#permfilter`·`#status`(로드 완료 시 파일명으로 시작).
   axmlllm 표 하이라이트는 행의 data-suite-* 속성 + ::after 배지로만 그린다 — 셀 텍스트를 바꾸면 axmlllm 복사/클릭 이동이 깨진다.
   도구에서 이 이름이 바뀌면 bridge만 고치면 된다.
+- 테마·디자인: 셸 색 체계는 dexllm 토큰(--bg·--bg-1~4·--line-1~3·--fg·--brand…) + VoiceX 효과, 다크/라이트는 `theme.js`(head에서 동기 실행, localStorage `suite.theme`).
+  라이트일 때 도구 iframe에는 같은 이름의 토큰을 덮어쓰고, 도구 CSS에 직접 적힌 색은 CSSOM을 읽어 밝기만 뒤집어 재선언한다 — 도구 DOM 선택자를 손으로 적지 말 것.
+  브리지가 도구 안에 넣는 CSS도 색은 토큰(`var(--good)` 등)으로. exe 빌드(build.sh)는 theme.js도 복사한다.
 - 통합 도구 정의는 `core/suite.mjs` 하나 — 웹 터미널(terminal.js)·MCP(mcp/server.mjs)·CLI(mcp/cli.mjs)가 같이 쓴다. 도구를 고치면 세 곳이 같이 바뀐다.
   매니페스트→게이트 사실 규칙은 `core/facts.mjs`(브리지도 dynamic import로 사용).
   의존하는 도구 쪽 이름 — 브라우저(웹 터미널): dexllm 페이지 `dk`·`wcall`(`decompile`/`extractIocs`), axmlllm worker 메시지 `init/open/tool/tree/components/classnames`·페이지 `session.tools`·`wcall`,

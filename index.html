@@ -4,179 +4,237 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Android LLM Suite</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0'%20y1='0'%20x2='1'%20y2='1'%3E%3Cstop%20offset='0'%20stop-color='%236ba1ff'/%3E%3Cstop%20offset='1'%20stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%2304050a'/%3E%3Cpath%20d='M9%2024%20L16%208%20L23%2024%20M11.8%2018.5%20H20.2'%20fill='none'%20stroke='url(%23g)'%20stroke-width='3.2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="theme.js"></script>
 <style>
+  /* 색 체계 = dexllm(순수 검정 + 파란 기조의 다층 표면, rgba 선), 효과 = VoiceX(그라데이션 브랜드·글로우 패널·LED 배지·매트릭스 배경).
+     테마: html[data-theme=dark|light] — theme.js가 저장값/시스템 설정으로 정하고 도구 iframe에도 같은 토큰을 내려 준다. */
+  :root, :root[data-theme=dark] {
+    color-scheme: dark;
+    --bg:#000000; --bg-1:#04050a; --bg-2:#08090f; --bg-3:#0d0f16; --bg-4:#13161f;
+    --line-1:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.09); --line-3:rgba(255,255,255,.14);
+    --fg:#e6e9f0; --fg-2:#b6bbc7; --fg-3:#6f7480;
+    --brand:#6ba1ff; --brand-rgb:107,161,255; --cyan:#22d3ee; --cyan-rgb:34,211,238;
+    --good:#5fdca0; --good-rgb:95,220,160; --warn:#f5b441; --bad:#ff5e5e; --mcp:#c8a8ff; --mcp-rgb:200,168,255;
+    --glass:linear-gradient(180deg, rgba(18,24,36,.74), rgba(8,11,18,.82));
+    --chrome:linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+    --shadow:0 8px 26px rgba(0,0,0,.42);
+    --term-bg:#020307; --glow:1;
+  }
+  :root[data-theme=light] {
+    color-scheme: light;
+    --bg:#f3f5f9; --bg-1:#ffffff; --bg-2:#ffffff; --bg-3:#eef2f7; --bg-4:#e3e9f2;
+    --line-1:rgba(15,23,42,.06); --line-2:rgba(15,23,42,.11); --line-3:rgba(15,23,42,.18);
+    --fg:#0f172a; --fg-2:#334155; --fg-3:#64748b;
+    --brand:#2563eb; --brand-rgb:37,99,235; --cyan:#0891b2; --cyan-rgb:8,145,178;
+    --good:#059669; --good-rgb:5,150,105; --warn:#b45309; --bad:#dc2626; --mcp:#7c3aed; --mcp-rgb:124,58,237;
+    --glass:linear-gradient(180deg, rgba(255,255,255,.9), rgba(247,249,252,.92));
+    --chrome:linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+    --shadow:0 8px 24px rgba(15,23,42,.08);
+    --term-bg:#fbfcfe; --glow:.45;
+  }
   :root {
-    --bg: #0d1117;
-    --panel: #161b22;
-    --border: #30363d;
-    --text: #e6edf3;
-    --muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-dim: #1f6feb33;
+    --grad:linear-gradient(135deg, var(--brand), var(--cyan));
+    --e-out:cubic-bezier(0.16,1,0.3,1);
+    --f-ui:-apple-system, BlinkMacSystemFont, "Inter", "Segoe UI Variable Display", "Segoe UI", "Noto Sans KR", system-ui, sans-serif;
+    --f-mono:"JetBrains Mono", "SF Mono", ui-monospace, "Cascadia Code", "D2Coding", Menlo, Consolas, monospace;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
     word-break: keep-all;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
-    display: flex;
-    flex-direction: column;
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.5 var(--f-ui);
+    -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+    display: flex; flex-direction: column;
+    transition: background-color .25s, color .25s;
   }
+  ::selection { background: rgba(var(--brand-rgb), .28); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--line-3); background-clip: padding-box; }
+
+  /* ── 헤더 ── */
   header {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 0 16px;
-    height: 52px;
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+    display: flex; align-items: center; gap: 16px; padding: 0 16px; height: 52px; flex-shrink: 0;
+    background: var(--chrome); border-bottom: 1px solid var(--line-2); position: relative; z-index: 5;
+  }
+  header::after {   /* VoiceX accentline — 헤더 하단의 브랜드 그라데이션 선 */
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(var(--brand-rgb), .55) 20%, rgba(var(--cyan-rgb), .55) 80%, transparent);
+    opacity: calc(.4 + .6 * var(--glow));
   }
   header .brand {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    cursor: pointer;
-    white-space: nowrap;
+    display: flex; align-items: center; gap: 9px;
+    font-size: 15px; font-weight: 800; letter-spacing: -.1px; cursor: pointer; white-space: nowrap;
   }
-  header .brand span { color: var(--accent); }
-  nav { display: flex; gap: 4px; height: 100%; }
+  .grad {
+    background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 calc(8px * var(--glow)) rgba(var(--cyan-rgb), calc(.45 * var(--glow))));
+  }
+  .brand-dot {
+    width: 9px; height: 9px; border-radius: 50%; background: var(--cyan); flex-shrink: 0;
+    animation: dotPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes dotPulse {
+    0%,100% { box-shadow: 0 0 0 3px rgba(var(--cyan-rgb), .13), 0 0 6px rgba(var(--cyan-rgb), calc(.5 * var(--glow))); }
+    50%     { box-shadow: 0 0 0 4px rgba(var(--cyan-rgb), .22), 0 0 14px rgba(var(--cyan-rgb), calc(.95 * var(--glow))); }
+  }
+  nav { display: flex; gap: 2px; height: 100%; }
   nav button {
-    appearance: none;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: var(--muted);
-    font-size: 13.5px;
-    font-family: inherit;
-    padding: 0 14px;
-    cursor: pointer;
-    height: 100%;
-    white-space: nowrap;
+    appearance: none; background: none; border: none; position: relative;
+    color: var(--fg-3); font: 500 13.5px var(--f-ui); padding: 0 14px; cursor: pointer; height: 100%; white-space: nowrap;
+    transition: color .15s;
   }
-  nav button:hover { color: var(--text); }
-  nav button.active {
-    color: var(--text);
-    border-bottom-color: var(--accent);
-    font-weight: 600;
+  nav button:hover { color: var(--fg); }
+  nav button::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: 0; height: 2px; border-radius: 2px;
+    background: var(--grad); opacity: 0; transform: scaleX(.4); transition: opacity .2s, transform .3s var(--e-out);
+    box-shadow: 0 0 calc(10px * var(--glow)) rgba(var(--cyan-rgb), .6);
   }
-  header .ver {
-    margin-left: auto;
-    font-size: 11.5px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  main { flex: 1; position: relative; overflow: hidden; }
-  /* 숨긴 탭은 display:none이 아니라 visibility:hidden — 레이아웃이 살아 있어야
-     iframe 문서와 내부 스크롤 영역의 위치가 탭을 오가도 유지된다 */
-  .view {
-    position: absolute;
-    inset: 0;
-    visibility: hidden;
-    pointer-events: none;
-  }
-  .view.active { visibility: visible; pointer-events: auto; z-index: 1; }
-  .view iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    background: var(--bg);
-  }
-  /* 홈 랜딩 */
-  #home { overflow-y: auto; }
-  .hero { text-align: center; padding: 56px 20px 8px; }
-  .hero h1 { font-size: 26px; font-weight: 800; }
-  .hero h1 span { color: var(--accent); }
-  .hero p { color: var(--muted); margin-top: 10px; font-size: 14px; }
-  .cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
-    justify-content: center;
-    gap: 18px;
-    padding: 24px 24px 56px;
-  }
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 22px 20px;
-    cursor: pointer;
-    transition: border-color .15s, transform .15s;
-  }
-  .card:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .card img { width: 44px; height: 44px; border-radius: 8px; margin-bottom: 14px; }
-  .card h2 { font-size: 16px; margin-bottom: 6px; }
-  .card .tag {
-    display: inline-block;
-    font-size: 11px;
-    color: var(--accent);
-    background: var(--accent-dim);
-    border-radius: 999px;
-    padding: 2px 9px;
-    margin-bottom: 10px;
-  }
-  .card p { font-size: 13px; color: var(--muted); line-height: 1.55; }
-  /* 통합 드롭존 — 파일 하나를 세 도구에 동시에 */
-  .dropzone {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
-    width: min(996px, calc(100% - 48px)); min-height: 170px; margin: 32px auto 0; padding: 28px 24px;
-    border: 2px dashed var(--border); border-radius: 12px; text-align: center;
-    background: var(--panel); cursor: pointer; transition: border-color .15s, background .15s;
-  }
-  .dropzone:hover, body.drag .dropzone { border-color: var(--accent); background: var(--accent-dim); }
-  .dropzone .ico { font-size: 30px; line-height: 1; color: var(--accent); }
-  .dropzone b { font-size: 17px; }
-  .dropzone p { color: var(--muted); font-size: 12.5px; line-height: 1.6; }
-  .dropzone .cur { font-size: 13px; color: var(--accent); }
-  .dropzone .cur:empty { display: none; }
+  nav button.active { color: var(--fg); font-weight: 650; }
+  nav button.active::after { opacity: 1; transform: none; }
+  /* 탭의 엔진 상태 — VoiceX LED */
   nav button .dot {
     display: inline-block; width: 7px; height: 7px; border-radius: 50%;
     margin-left: 7px; vertical-align: middle; background: transparent;
   }
-  nav button .dot.busy { background: #d29922; animation: pulse 1s infinite; }
-  nav button .dot.ok { background: #3fb950; }
-  nav button .dot.err { background: #f85149; }
-  nav button .dot.skip { background: var(--border); }
-  @keyframes pulse { 50% { opacity: .3; } }
-  header .sync { font-size: 12px; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 5px; cursor: pointer; }
-  @media (max-width: 900px) { header .ver, header .file { display: none; } }
+  nav button .dot.busy { background: var(--warn); box-shadow: 0 0 calc(8px * var(--glow)) var(--warn); animation: blink 1s infinite; }
+  nav button .dot.ok { background: var(--good); box-shadow: 0 0 calc(8px * var(--glow)) var(--good); }
+  nav button .dot.err { background: var(--bad); box-shadow: 0 0 calc(8px * var(--glow)) var(--bad); }
+  nav button .dot.skip { background: var(--line-3); }
+  @keyframes blink { 50% { opacity: .35; } }
+  header .file {
+    font: 12px var(--f-mono); color: var(--fg-2); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  header .sync { font-size: 12px; color: var(--fg-3); white-space: nowrap; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  header .sync input { accent-color: var(--brand); }
+  header .ver { margin-left: auto; font: 11px var(--f-mono); color: var(--fg-3); white-space: nowrap; }
+  @media (max-width: 900px) { header .ver, header .file { display: none; } header .mcpstat { margin-left: auto; } }
   @media (max-width: 640px) { header { gap: 8px; } nav button { padding: 0 8px; } header .brand { font-size: 13px; } }
-  header .file { font-size: 12px; color: var(--text); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .hbtn {
+    appearance: none; background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 7px;
+    color: var(--fg-2); font: 12px var(--f-mono); padding: 4px 9px; cursor: pointer; white-space: nowrap;
+    transition: color .15s, border-color .15s, box-shadow .2s;
+  }
+  header .hbtn:hover, header .hbtn.active {
+    color: var(--fg); border-color: rgba(var(--cyan-rgb), .55); box-shadow: 0 0 calc(12px * var(--glow)) rgba(var(--cyan-rgb), .25);
+  }
+  header .themebtn { font-size: 13px; padding: 3px 8px; line-height: 1.2; }
+  /* MCP 연결 배지 — VoiceX LED pill */
+  header .mcpstat {
+    font: 600 11px var(--f-mono); color: var(--fg-3); cursor: pointer; letter-spacing: .3px;
+    border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 9px 2px 19px; position: relative; white-space: nowrap;
+  }
+  header .mcpstat::before {
+    content: ""; position: absolute; left: 7px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--line-3);
+  }
+  header .mcpstat.on {
+    color: var(--good); border-color: rgba(var(--good-rgb), .5);
+    background: linear-gradient(180deg, rgba(var(--good-rgb), .16), rgba(var(--good-rgb), .06));
+    box-shadow: 0 0 calc(11px * var(--glow)) rgba(var(--good-rgb), .28);
+  }
+  header .mcpstat.on::before { background: var(--good); box-shadow: 0 0 6px var(--good); animation: ledPulse 1.8s ease-in-out infinite; }
+  header .mcpstat.busy::before { background: var(--mcp); box-shadow: 0 0 6px var(--mcp); animation: blink .6s infinite; }
+  @keyframes ledPulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+  /* ── 본문 ── */
+  main { flex: 1; position: relative; overflow: hidden; }
+  /* 숨긴 탭은 display:none이 아니라 visibility:hidden — 레이아웃이 살아 있어야
+     iframe 문서와 내부 스크롤 영역의 위치가 탭을 오가도 유지된다 */
+  .view { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
+  .view.active { visibility: visible; pointer-events: auto; z-index: 1; }
+  .view iframe { width: 100%; height: 100%; border: none; background: var(--bg); }
+
+  /* ── 홈 ── */
+  #view-home {
+    background:
+      radial-gradient(1200px 600px at 75% -10%, rgba(var(--brand-rgb), .07), transparent 60%),
+      radial-gradient(900px 600px at 0% 100%, rgba(var(--cyan-rgb), .04), transparent 60%);
+  }
+  #matrix { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: calc(.12 * var(--glow)); }
+  #home { position: relative; z-index: 1; height: 100%; overflow-y: auto; }
+  .hero { text-align: center; padding: 58px 20px 6px; }
+  .hero h1 { display: inline-flex; align-items: center; gap: 14px; font-size: 38px; font-weight: 800; letter-spacing: -.6px; line-height: 1.1; }
+  .hero h1 .brand-dot { width: 12px; height: 12px; }
+  .accentline { height: 2px; width: 56px; border-radius: 2px; background: var(--grad); margin: 16px auto 0;
+    box-shadow: 0 0 calc(10px * var(--glow)) rgba(var(--cyan-rgb), .5); }
+  .hero p { color: var(--fg-3); margin-top: 14px; font-size: 14px; }
+  .hero .chips { display: flex; gap: 8px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+  .chip { font: 600 11px var(--f-mono); color: var(--fg-2); border: 1px solid var(--line-2); border-radius: 99px; padding: 3px 10px; letter-spacing: .3px; background: var(--bg-2); }
+  @keyframes panelIn { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: none; } }
+  @keyframes panelGlow {
+    0%,100% { box-shadow: 0 0 0 1px rgba(var(--cyan-rgb), .10), 0 0 calc(16px * var(--glow)) rgba(var(--cyan-rgb), .05), var(--shadow); border-color: rgba(var(--cyan-rgb), .22); }
+    50%     { box-shadow: 0 0 0 1px rgba(var(--cyan-rgb), .28), 0 0 calc(26px * var(--glow)) rgba(var(--cyan-rgb), .14), var(--shadow); border-color: rgba(var(--cyan-rgb), .48); }
+  }
+  /* 통합 드롭존 — 파일 하나를 세 도구에 동시에 (VoiceX 글로우 패널) */
+  .dropzone {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    width: min(996px, calc(100% - 48px)); min-height: 176px; margin: 34px auto 0; padding: 28px 24px;
+    border: 1px solid rgba(var(--cyan-rgb), .26); border-radius: 14px; text-align: center; cursor: pointer;
+    background: var(--glass); backdrop-filter: blur(9px) saturate(1.15); -webkit-backdrop-filter: blur(9px) saturate(1.15);
+    animation: panelIn .45s cubic-bezier(.2,.7,.2,1), panelGlow 4.2s ease-in-out infinite;
+    transition: transform .15s, background .15s;
+  }
+  .dropzone:hover, body.drag .dropzone { transform: translateY(-1px); animation: panelIn .45s cubic-bezier(.2,.7,.2,1);
+    border-color: rgba(var(--cyan-rgb), .7); box-shadow: 0 0 0 1px rgba(var(--cyan-rgb), .35), 0 0 calc(32px * var(--glow)) rgba(var(--cyan-rgb), .22), var(--shadow); }
+  .dropzone .ico {
+    width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 4px;
+    font-size: 22px; color: #fff; background: var(--grad);
+    box-shadow: 0 0 calc(18px * var(--glow)) rgba(var(--cyan-rgb), .45), inset 0 0 10px rgba(255,255,255,.18);
+  }
+  .dropzone b { font-size: 17px; }
+  .dropzone p { color: var(--fg-3); font-size: 12.5px; line-height: 1.65; }
+  .dropzone .cur { font: 12.5px var(--f-mono); color: var(--cyan); }
+  .dropzone .cur:empty { display: none; }
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 320px));
+    justify-content: center; gap: 18px; padding: 24px 24px 56px;
+  }
+  .card {
+    position: relative; overflow: hidden; background: var(--glass); border: 1px solid var(--line-2); border-radius: 12px;
+    padding: 22px 20px; cursor: pointer; animation: panelIn .5s cubic-bezier(.2,.7,.2,1) backwards;
+    transition: border-color .2s, transform .2s var(--e-out), box-shadow .2s;
+  }
+  .card:nth-child(2) { animation-delay: .05s; } .card:nth-child(3) { animation-delay: .1s; }
+  .card::before {   /* 상단 하이라이트 선 */
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(var(--cyan-rgb), .5), transparent); opacity: 0; transition: opacity .2s;
+  }
+  .card:hover { border-color: rgba(var(--cyan-rgb), .5); transform: translateY(-3px);
+    box-shadow: 0 0 calc(22px * var(--glow)) rgba(var(--cyan-rgb), .14), var(--shadow); }
+  .card:hover::before { opacity: 1; }
+  .card img { width: 44px; height: 44px; border-radius: 10px; margin-bottom: 14px; box-shadow: 0 0 0 1px var(--line-2); }
+  .card h2 { font-size: 16px; margin-bottom: 6px; }
+  .card .tag {
+    display: inline-block; font: 600 11px var(--f-mono); color: var(--brand); letter-spacing: .2px;
+    background: rgba(var(--brand-rgb), .1); border: 1px solid rgba(var(--brand-rgb), .28); border-radius: 999px; padding: 2px 9px; margin-bottom: 10px;
+  }
+  .card p { font-size: 13px; color: var(--fg-3); line-height: 1.6; }
+
   /* 도구 간 연동 알림 (suite-bridge.js) */
   #suite-toast {
     position: fixed; right: 18px; bottom: 18px; z-index: 50; max-width: 520px;
-    padding: 10px 14px; border-radius: 8px; font-size: 13px; line-height: 1.5;
-    background: var(--panel); border: 1px solid var(--accent); color: var(--text);
-    box-shadow: 0 6px 24px rgba(0,0,0,.5); cursor: pointer;
+    padding: 10px 14px; border-radius: 10px; font-size: 13px; line-height: 1.5;
+    background: var(--glass); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px);
+    border: 1px solid rgba(var(--cyan-rgb), .5); color: var(--fg);
+    box-shadow: 0 0 calc(18px * var(--glow)) rgba(var(--cyan-rgb), .2), var(--shadow); cursor: pointer;
     opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .15s, transform .15s;
   }
   #suite-toast.on { opacity: 1; transform: none; pointer-events: auto; }
-  #suite-toast.warn { border-color: #d29922; }
-  /* 웹 터미널 (terminal.js) — 통합 MCP와 같은 명령 */
-  header .termbtn {
-    appearance: none; background: none; border: 1px solid var(--border); border-radius: 6px;
-    color: var(--muted); font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    padding: 4px 9px; cursor: pointer; white-space: nowrap;
-  }
-  header .termbtn:hover, header .termbtn.active { color: var(--text); border-color: var(--accent); }
-  header .mcpstat {
-    font: 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); cursor: pointer;
-    border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px 2px 18px; position: relative; white-space: nowrap;
-  }
-  header .mcpstat::before {
-    content: ""; position: absolute; left: 7px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 50%; background: var(--border);
-  }
-  header .mcpstat.on { color: var(--text); border-color: #3fb95066; }
-  header .mcpstat.on::before { background: #3fb950; }
-  header .mcpstat.busy::before { background: #d2a8ff; animation: pulse .6s infinite; }
-  .term-out .mcp { color: #d2a8ff; }
-  .term-out .cmd.mcp .ps { color: #d2a8ff; }
+  #suite-toast.warn { border-color: var(--warn); box-shadow: 0 0 calc(18px * var(--glow)) rgba(245,180,65,.2), var(--shadow); }
+
+  /* ── 웹 터미널 (terminal.js) — 통합 MCP와 같은 명령 ── */
+  .term-out .mcp { color: var(--mcp); }
+  .term-out .cmd.mcp .ps { color: var(--mcp); }
   .term {
     flex-shrink: 0; display: flex; flex-direction: column; position: relative;
-    background: #010409; border-top: 1px solid var(--border);
-    font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, "D2Coding", monospace;
+    background: var(--term-bg); border-top: 1px solid var(--line-2);
+    font: 12.5px/1.55 var(--f-mono);
+  }
+  .term::before {
+    content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(var(--cyan-rgb), .5), transparent);
   }
   .term[hidden] { display: none; }
   .term-grip { position: absolute; top: -4px; left: 0; right: 0; height: 8px; cursor: ns-resize; z-index: 2; }
@@ -184,41 +242,43 @@
   body.resizing iframe { pointer-events: none; }
   .term-bar {
     display: flex; align-items: center; gap: 12px; padding: 4px 10px; flex-shrink: 0;
-    border-bottom: 1px solid var(--border); background: var(--panel); color: var(--muted); font-size: 11.5px;
+    border-bottom: 1px solid var(--line-1); background: var(--chrome); color: var(--fg-3); font-size: 11.5px;
   }
-  .term-bar b { color: var(--text); font-weight: 600; }
+  .term-bar b { color: var(--fg); font-weight: 650; }
   .term-bar .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .term-bar label { margin-left: auto; display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
-  .term-bar button { appearance: none; background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 0 4px; }
-  .term-bar button:hover { color: var(--text); }
+  .term-bar input { accent-color: var(--brand); }
+  .term-bar button { appearance: none; background: none; border: none; color: var(--fg-3); font-size: 16px; cursor: pointer; padding: 0 4px; }
+  .term-bar button:hover { color: var(--fg); }
   .term-out { flex: 1; overflow: auto; padding: 6px 12px; }
   .term-out .tb { position: relative; white-space: pre-wrap; word-break: break-all; }
   .term-out pre { font: inherit; white-space: pre-wrap; word-break: break-all; margin: 0; }
-  .term-out .cmd { color: var(--text); margin-top: 8px; }
-  .term-out .ps, .term-in .ps { color: var(--accent); }
-  .term-out .res { color: #c9d1d9; }
-  .term-out .help { color: #c9d1d9; }
-  .term-out .head { color: var(--accent); }
-  .term-out .dim { color: var(--muted); }
-  .term-out .busy { animation: pulse 1s infinite; }
-  .term-out .err { color: #f85149; }
-  .term-out .xch { color: #d2a8ff; }
-  .term-out .tdesc { color: #7ee787; cursor: pointer; }
+  .term-out .cmd { color: var(--fg); margin-top: 8px; }
+  .term-out .ps, .term-in .ps { color: var(--brand); }
+  .term-out .res, .term-out .help { color: var(--fg-2); }
+  .term-out .head { color: var(--cyan); }
+  .term-out .dim { color: var(--fg-3); }
+  .term-out .busy { animation: blink 1s infinite; }
+  .term-out .err { color: var(--bad); }
+  .term-out .xch { color: var(--mcp); }
+  .term-out .tdesc { color: var(--good); cursor: pointer; }
   .term-out .tdesc:hover { text-decoration: underline; }
   .term-out .tcopy {
-    position: absolute; top: 0; right: 0; appearance: none; background: var(--panel); border: 1px solid var(--border);
-    color: var(--muted); border-radius: 4px; font-size: 12px; cursor: pointer; opacity: 0; padding: 0 5px;
+    position: absolute; top: 0; right: 0; appearance: none; background: var(--bg-3); border: 1px solid var(--line-2);
+    color: var(--fg-3); border-radius: 5px; font-size: 12px; cursor: pointer; opacity: 0; padding: 0 5px;
   }
   .term-out .tb:hover .tcopy { opacity: 1; }
-  .term-in { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
-  .term-in input {
-    flex: 1; background: none; border: none; outline: none; color: var(--text); font: inherit; caret-color: var(--accent);
+  .term-in { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--line-1); flex-shrink: 0; }
+  .term-in input { flex: 1; background: none; border: none; outline: none; color: var(--fg); font: inherit; caret-color: var(--cyan); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    #matrix { display: none; }
   }
 </style>
 </head>
 <body>
 <header>
-  <div class="brand" onclick="show('home')">Android <span>LLM</span> Suite</div>
+  <div class="brand" onclick="show('home')"><span class="brand-dot"></span>Android <span class="grad">LLM</span> Suite</div>
   <nav id="nav">
     <button data-view="home" class="active" onclick="show('home')">홈</button>
     <button data-view="axmlllm" onclick="show('axmlllm')" title="Ctrl+1">axmlllm · AXML<span class="dot"></span></button>
@@ -229,14 +289,18 @@
   <label class="sync" title="한 도구에 파일을 열면 나머지 도구에도 같은 파일을 연다"><input type="checkbox" id="sync" checked>동시 분석</label>
   <div class="ver" id="ver"></div>
   <span class="mcpstat" id="mcpstat" hidden>MCP</span>
-  <button class="termbtn" id="termbtn" title="웹 터미널 — 통합 MCP와 같은 명령 (Ctrl+`)">&gt;_ 터미널</button>
+  <button class="hbtn themebtn" id="themebtn" title="테마 전환 (다크 · 라이트)">☾</button>
+  <button class="hbtn termbtn" id="termbtn" title="웹 터미널 — 통합 MCP와 같은 명령 (Ctrl+`)">&gt;_ 터미널</button>
 </header>
 <main>
   <div class="view active" id="view-home">
+    <canvas id="matrix" aria-hidden="true"></canvas>
     <div id="home">
       <div class="hero">
-        <h1>Android <span>LLM</span> Suite</h1>
+        <h1><span class="brand-dot"></span><span>Android <span class="grad">LLM</span> Suite</span></h1>
+        <div class="accentline"></div>
         <p>AndroidManifest(AXML) · DEX 바이트코드 · APK 컨테이너 — llm 시리즈 웹 분석 도구 통합 콘솔</p>
+        <div class="chips"><span class="chip">WASM · 브라우저 안에서만</span><span class="chip">교차 분석 xref</span><span class="chip">MCP · CLI</span></div>
       </div>
       <label class="dropzone" id="dropzone">
         <input type="file" id="suitefile" hidden accept=".apk,.apks,.xapk,.zip,.jar,.dex,.xml,application/octet-stream">
@@ -301,7 +365,7 @@
     if (!f) {
       f = document.createElement('iframe');
       f.src = view.dataset.src;
-      f.addEventListener('load', () => hookFrame(name, f));
+      f.addEventListener('load', () => { window.SuiteTheme && SuiteTheme.frame(f); hookFrame(name, f); });
       view.appendChild(f);
     }
     return f;
