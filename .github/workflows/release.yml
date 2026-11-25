@@ -30,17 +30,29 @@ jobs:
       - run: cmd/android-llm/build.sh "$TAG"
       # MCP 배포 zip — 엔진 3개·node 패키지·Pyodide 포함 ("Source code (zip)"에는 서브모듈이 없다)
       - run: mcp/bundle.sh "$TAG"
+      # 전체 소스 zip — 서브모듈 포함 추적 파일 전부 + VERSION (GitHub "Source code"에는 서브모듈이 없다).
+      # 풀고 cmd/android-llm/build.sh 로 같은 exe를 빌드할 수 있다. 예전 태그 재첨부도 되도록 스크립트 파일 없이 여기서 만든다.
+      - name: source bundle
+        run: |
+          d="dist/.src/android-llm-$TAG"
+          rm -rf dist/.src && mkdir -p "$d"
+          git ls-files --recurse-submodules -z | xargs -0 cp --parents -t "$d"
+          echo "$TAG" > "$d/VERSION"
+          (cd dist/.src && zip -qr -X "../android-llm-$TAG-src.zip" "android-llm-$TAG")
+          rm -rf dist/.src
       - name: release
         run: |
           exe="dist/android-llm-$TAG-windows-amd64.exe"
           mcpzip="dist/android-llm-$TAG-mcp.zip"
+          srczip="dist/android-llm-$TAG-src.zip"
           notes="$(python3 -c "import json;print('\n'.join(f'- {k} {v}' for k,v in json.load(open('versions.json')).items()))")"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "$exe" "$mcpzip" --clobber
+            gh release upload "$TAG" "$exe" "$mcpzip" "$srczip" --clobber
           else
-            gh release create "$TAG" "$exe" "$mcpzip" --title "$TAG" --notes "$(printf '%s\n\n%s\n\n%s\n\n%s' \
+            gh release create "$TAG" "$exe" "$mcpzip" "$srczip" --title "$TAG" --notes "$(printf '%s\n\n%s\n\n%s\n\n%s\n\n%s' \
               "- 웹 콘솔 (Windows): ${exe#dist/} 실행 → 브라우저가 열림 (오프라인 동작)" \
               "- MCP 서버 (Claude Code · Copilot, Windows/Linux/macOS): ${mcpzip#dist/} 풀고 등록 — 엔진 3개·node 패키지·Pyodide 포함, git·npm 불필요. 방법은 mcp/README.md" \
-              "※ GitHub 자동 생성 \"Source code\" 압축에는 엔진(서브모듈)과 node 패키지가 없습니다 — MCP는 위 mcp.zip을 쓰세요." \
+              "- 전체 소스 (exe 직접 빌드): ${srczip#dist/} — 서브모듈 포함. 풀고 cmd/android-llm/build.sh (Go 1.23 · bash · curl · python3)" \
+              "※ GitHub 자동 생성 \"Source code\" 압축에는 엔진(서브모듈)이 없습니다 — 위 mcp.zip / src.zip을 쓰세요." \
               "$notes")"
           fi

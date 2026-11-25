@@ -12,9 +12,16 @@
 
 ## 빌드
 
+소스는 둘 중 하나 — GitHub 자동 "Source code" 압축에는 서브모듈(세 도구)이 없어 빌드되지 않는다.
+- Releases의 `android-llm-<ver>-src.zip` (서브모듈 포함 전체 소스, git 불필요)
+- `git clone --recurse-submodules --branch <ver> https://github.com/mobile-threat-hunter/android-llm`
+
 ```bash
 cmd/android-llm/build.sh [버전]     # → dist/android-llm-<ver>-windows-amd64.exe + 네이티브 바이너리
 ```
+
+버전을 빼면 git describe, 없으면 src.zip의 `VERSION`(v0.9.5부터 — v0.9.4 src.zip은 `build.sh v0.9.4`처럼 직접 준다).
+Windows에서는 Git Bash로 실행. 결과 exe는 Go 패치 버전·빌드 경로 차이로 Release exe와 바이트가 같지는 않다(내용물은 같은 소스).
 
 필요: Go ≥ 1.22, curl, python3. `static/`은 빌드 때마다 다시 조립된다(커밋 안 함):
 

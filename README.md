@@ -5,6 +5,7 @@ axmlllm-web(AXML/Manifest) · dexllm-web(DEX) · apkllm-web(APK 컨테이너)을
 - 웹: https://mobile-threat-hunter.github.io/android-llm/
 - Windows 로컬(오프라인): Releases의 `android-llm-<ver>-windows-amd64.exe` — [cmd/android-llm](cmd/android-llm/README.md)
 - MCP 서버(Claude Code · Copilot): Releases의 `android-llm-<ver>-mcp.zip` (엔진·패키지 포함) — [mcp/README.md](mcp/README.md)
+- 전체 소스: Releases의 `android-llm-<ver>-src.zip` (서브모듈 포함 — exe 직접 빌드용)
   ※ GitHub 자동 "Source code" 압축에는 엔진(서브모듈)·node 패키지가 없다.
 
 탭 순서: 홈 · axmlllm · dexllm · apkllm — **Ctrl+1 / 2 / 3** 으로 전환 (도구 화면 안에 포커스가 있어도 동작).

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Assemble static/ from the repo root + submodules + Pyodide core, then build
 # dist/android-llm-<ver>-windows-amd64.exe (and a native binary for smoke tests).
-# 사용: cmd/android-llm/build.sh [버전]   (기본: git describe)
+# 사용: cmd/android-llm/build.sh [버전]   (기본: git describe, 소스 zip이면 VERSION)
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
-ver="${1:-$(git -C "$root" describe --tags --always)}"
+# 버전: 인자 → git describe → 소스 zip의 VERSION 파일(git 없이 푼 경우)
+ver="${1:-$(git -C "$root" describe --tags --always 2>/dev/null || cat "$root/VERSION" 2>/dev/null || echo dev)}"
 st="$here/static"
 
 rm -rf "$st"; mkdir -p "$st"
