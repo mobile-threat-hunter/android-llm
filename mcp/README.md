@@ -89,8 +89,15 @@ node cli.mjs app.apk -e xref_native -e "dex_iocs" -q   # 여러 명령, -q = 진
 
 ## 구조
 
-- `backend-node.mjs` — 엔진: dexllm은 `dexllm-web/mcp/engine.mjs`, axmlllm·apkllm은 각 저장소의 **worker.js를 그대로** `workerhost.mjs`(vm 기반 최소 Web Worker 호스트)에서 돌린다. 웹 페이지와 같은 파일·같은 메시지 프로토콜.
-- `pyodide-cache.mjs` — axmlllm worker.js가 CDN에서 받는 Pyodide 파일을 로컬 캐시로 돌린다.
+- `engines/` — Node 엔진 계층(이 저장소 소유). 서브모듈에서는 **엔진 빌드 산출물만** 쓴다 — 도구 페이지·worker.js에 의존하지 않는다.
+  - `dexllm.mjs` — `dexllm-web/dexllm.{js,wasm}` 직접 로드
+  - `apkllm.mjs` — `apkllm-web/apkllm.{js,wasm}` + `domain.js` 직접 로드 (load/gate 호출 순서는 apkllm-web 페이지와 같음)
+  - `axmlllm.mjs` — Pyodide를 Node에서 공식 방식으로 띄우고 `axmlllm-web/*.whl` 설치 (페이지용 보조 함수와 같은 Python)
+  - `pyodide.mjs` — Pyodide 파일: 배포 zip의 `mcp/pyodide-<ver>/` → 없으면 로컬 캐시(없는 파일만 jsdelivr에서 한 번)
+  - `assets.mjs` — 엔진 파일 목록·버전 핀(배포 zip은 `engines/build.json`, 저장소는 axmlllm-web 핀) — `preflight.mjs`·`bundle.sh`도 이 목록을 쓴다
+- `backend-node.mjs` — 세 엔진을 병렬로 띄우고 파일 종류별로 연다(ZIP → 셋, dex → dexllm, AXML → axmlllm).
+- `bundle.sh` — 릴리즈용 `android-llm-<ver>-mcp.zip`: mcp/·core/ + 엔진 파일 + node 패키지 + Pyodide (도구 페이지 미포함).
+- `preflight.mjs` — 시작 전 엔진·패키지 확인(없으면 원인과 해결 명령).
 - `relay.mjs` — 웹 콘솔 중계(WebSocket, 루프백 전용).
 - `server.mjs` — MCP stdio (도구 목록은 core에서, axml_*는 엔진이 내보내는 목록).
 - `cli.mjs` — 같은 도구의 명령줄.

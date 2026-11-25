@@ -11,10 +11,10 @@
 //   load({ path })         파일 열기 (node: 경로, web: 파일 선택 창)
 //   tools()                { dexllm|axmlllm|apkllm: { state: "ready"|"loading"|"error"|"none", detail? } }
 //   dex()                  { dk, decompile(cls) → Promise<string>, iocs() → Promise<{network, providers}> }
-//   axml(msg)              axmlllm worker.js 메시지 ({type:"tool"|"components"|"tree"|"classnames", …})
+//   axml(msg)              axmlllm 메시지 — 웹은 페이지 worker.js, Node는 mcp/engines/axmlllm.mjs ({type:"tool"|"components"|"tree"|"classnames", …})
 //   axmlTools()            axmlllm TOOL_DEFINITIONS ([{name, description, input_schema}])
 //   apkReport()            apkllm worker "load" 결과 { tamper, signing, traces, certs, frosting, content, input }
-//   apk(msg)               apkllm worker.js 메시지 ({type:"gate", …})
+//   apk(msg)               apkllm 메시지 — 웹은 페이지 worker.js, Node는 mcp/engines/apkllm.mjs ({type:"gate", …})
 //   log                    교환 기록 배열 (웹에서는 suite-bridge가 같은 배열에 쌓는다)
 import { descToJava, origDottedToDesc, computePerms, computeComponents, computeCaps }
   from "../dexllm-web/mcp/ported.mjs";

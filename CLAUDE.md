@@ -16,13 +16,14 @@ dexllm-web · axmlllm-web · apkllm-web 통합 웹 콘솔. 이 저장소는 **UI
   도구에서 이 이름이 바뀌면 bridge만 고치면 된다.
 - 통합 도구 정의는 `core/suite.mjs` 하나 — 웹 터미널(terminal.js)·MCP(mcp/server.mjs)·CLI(mcp/cli.mjs)가 같이 쓴다. 도구를 고치면 세 곳이 같이 바뀐다.
   매니페스트→게이트 사실 규칙은 `core/facts.mjs`(브리지도 dynamic import로 사용).
-  의존하는 도구 쪽 이름 — dexllm: `dexllm-web/mcp/engine.mjs`·`ported.mjs`(import), 페이지 `dk`·`wcall`(`decompile`/`extractIocs`),
-  axmlllm: worker.js 메시지 `init/open/tool/tree/components/classnames`, worker 최상위 `py`(Node에서 TOOL_DEFINITIONS 읽기), 페이지 `session.tools`·`wcall`,
-  apkllm: worker.js 메시지 `init/load/gate`, 페이지 `report`·`wcall`. Node에서는 axmlllm·apkllm의 worker.js를 그대로 vm에서 돌린다(mcp/workerhost.mjs).
+  의존하는 도구 쪽 이름 — 브라우저(웹 터미널): dexllm 페이지 `dk`·`wcall`(`decompile`/`extractIocs`), axmlllm worker 메시지 `init/open/tool/tree/components/classnames`·페이지 `session.tools`·`wcall`,
+  apkllm worker 메시지 `init/load/gate`·페이지 `report`·`wcall`, 공용 `dexllm-web/mcp/ported.mjs`(import).
+  Node(MCP·CLI): `mcp/engines/`가 엔진 빌드 산출물만 직접 띄운다(dexllm.{js,wasm}, apkllm.{js,wasm}+domain.js, axmlllm 휠+Pyodide) — 도구 페이지·worker.js는 쓰지 않는다.
+  apkllm load/gate 호출 순서와 axmlllm PY_SETUP(트리·컴포넌트·클래스 이름)은 각 페이지 worker와 같은 일을 하므로, 도구 쪽 worker가 바뀌면 engines/도 맞추고 브라우저↔Node 결과를 비교할 것.
 - MCP ↔ 웹 콘솔 중계: MCP 서버가 ws://127.0.0.1:47361(mcp/relay.mjs)을 열고, 로컬에서 연 콘솔(terminal.js, hostname이 루프백일 때만)이 붙는다.
   연결 중엔 MCP 호출을 브라우저 탭이 실행(같은 core) — suite_load는 바이트를 보내 셸 `openAll`로 연다. Origin·Host 루프백 검사는 빼지 말 것.
 - 웹 터미널과 Node MCP의 결과가 같아야 한다: 같은 APK로 `xref_*` 결과를 비교해 확인할 것.
 - headless Chrome 테스트 주의: 새 프로필로 막 뜬 Chrome은 시작 2~3초 구간의 fetch를 끊는다(axmlllm micropip "Failed to fetch"). 브라우저를 몇 초 띄워둔 뒤 테스트할 것 — 실사용에는 해당 없음.
-- MCP 배포 zip(`mcp/bundle.sh`, 릴리즈 CI가 첨부): git 추적 파일(서브모듈 포함) + `npm ci --omit=dev` + Pyodide(`mcp/pyodide-<ver>/`). 새 파일은 git add해야 zip에 들어간다.
+- MCP 배포 zip(`mcp/bundle.sh`, 릴리즈 CI가 첨부): mcp/·core/의 git 추적 파일(새 파일은 git add해야 들어감) + 엔진 파일(`engines/assets.mjs` 목록) + `npm ci --omit=dev` + Pyodide(`mcp/pyodide-<ver>/`, mcp가 ESM 범위라 그 폴더엔 commonjs package.json).
   server.mjs·cli.mjs는 `preflight.mjs`(내장 모듈만)로 엔진·패키지를 먼저 확인하고 나머지를 dynamic import한다 — 맨 위에 static import를 늘리지 말 것.
 - exe 빌드는 axmlllm-web/worker.js 사본의 Pyodide CDN base를 로컬 경로로 치환한다(build.sh). 그 문자열이 바뀌면 빌드가 실패하도록 돼 있음.

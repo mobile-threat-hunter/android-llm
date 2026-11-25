@@ -3,22 +3,19 @@
 // 흔한 원인: GitHub의 "Source code (zip)"(서브모듈 없음), --recurse-submodules 없는 clone, npm ci 생략.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const MCP = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.dirname(MCP);
+import { ROOT, MCP_DIR as MCP, ENGINE_FILES, axmlBuild } from "./engines/assets.mjs";   // 내장 모듈만 쓰는 파일
 
-const ENGINE_FILES = {
-  "dexllm-web": ["dexllm.js", "dexllm.wasm", "mcp/engine.mjs", "mcp/ported.mjs"],
-  "axmlllm-web": ["index.html", "worker.js"],
-  "apkllm-web": ["worker.js", "apkllm.js", "apkllm.wasm"],
-};
 const PACKAGES = ["@modelcontextprotocol/sdk", "ws"];
 
 export function preflight({ packages = true } = {}) {
   const missing = [];
   for (const [dir, files] of Object.entries(ENGINE_FILES))
     if (files.some(f => !fs.existsSync(path.join(ROOT, dir, f)))) missing.push(dir);
+  if (!missing.includes("axmlllm-web")) {
+    let wheel = null; try { wheel = axmlBuild().wheel; } catch (_) { /* 핀 없음 = 엔진 없음 */ }
+    if (!wheel || !fs.existsSync(path.join(ROOT, "axmlllm-web", wheel))) missing.push("axmlllm-web");
+  }
   const pkgs = packages ? PACKAGES.filter(p => !fs.existsSync(path.join(MCP, "node_modules", p, "package.json"))) : [];
   if (!missing.length && !pkgs.length) return;
 
