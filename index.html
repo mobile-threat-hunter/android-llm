@@ -8,8 +8,8 @@
 <script src="theme.js"></script>
 <style>
   /* 색 체계 = dexllm(순수 검정 + 파란 기조의 다층 표면, rgba 선), 효과 = VoiceX(그라데이션 브랜드·글로우 패널·LED 배지·매트릭스 배경).
-     테마: html[data-theme=dark|light] — theme.js가 저장값/시스템 설정으로 정하고 도구 iframe에도 같은 토큰을 내려 준다. */
-  :root, :root[data-theme=dark] {
+     다크 전용(라이트 모드 없음) — 도구 iframe은 각 도구의 자체 다크 화면 그대로. */
+  :root {
     color-scheme: dark;
     --bg:#000000; --bg-1:#04050a; --bg-2:#08090f; --bg-3:#0d0f16; --bg-4:#13161f;
     --line-1:rgba(255,255,255,.05); --line-2:rgba(255,255,255,.09); --line-3:rgba(255,255,255,.14);
@@ -20,18 +20,6 @@
     --chrome:linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
     --shadow:0 8px 26px rgba(0,0,0,.42);
     --term-bg:#020307; --glow:1;
-  }
-  :root[data-theme=light] {
-    color-scheme: light;
-    --bg:#f3f5f9; --bg-1:#ffffff; --bg-2:#ffffff; --bg-3:#eef2f7; --bg-4:#e3e9f2;
-    --line-1:rgba(15,23,42,.06); --line-2:rgba(15,23,42,.11); --line-3:rgba(15,23,42,.18);
-    --fg:#0f172a; --fg-2:#334155; --fg-3:#64748b;
-    --brand:#2563eb; --brand-rgb:37,99,235; --cyan:#0891b2; --cyan-rgb:8,145,178;
-    --good:#059669; --good-rgb:5,150,105; --warn:#b45309; --bad:#dc2626; --mcp:#7c3aed; --mcp-rgb:124,58,237;
-    --glass:linear-gradient(180deg, rgba(255,255,255,.9), rgba(247,249,252,.92));
-    --chrome:linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
-    --shadow:0 8px 24px rgba(15,23,42,.08);
-    --term-bg:#fbfcfe; --glow:.45;
   }
   :root {
     --grad:linear-gradient(135deg, var(--brand), var(--cyan));
@@ -120,7 +108,6 @@
   header .hbtn:hover, header .hbtn.active {
     color: var(--fg); border-color: rgba(var(--cyan-rgb), .55); box-shadow: 0 0 calc(12px * var(--glow)) rgba(var(--cyan-rgb), .25);
   }
-  header .themebtn { font-size: 13px; padding: 3px 8px; line-height: 1.2; }
   /* MCP 연결 배지 — VoiceX LED pill */
   header .mcpstat {
     font: 600 11px var(--f-mono); color: var(--fg-3); cursor: pointer; letter-spacing: .3px;
@@ -289,7 +276,6 @@
   <label class="sync" title="한 도구에 파일을 열면 나머지 도구에도 같은 파일을 연다"><input type="checkbox" id="sync" checked>동시 분석</label>
   <div class="ver" id="ver"></div>
   <span class="mcpstat" id="mcpstat" hidden>MCP</span>
-  <button class="hbtn themebtn" id="themebtn" title="테마 전환 (다크 · 라이트)">☾</button>
   <button class="hbtn termbtn" id="termbtn" title="웹 터미널 — 통합 MCP와 같은 명령 (Ctrl+`)">&gt;_ 터미널</button>
 </header>
 <main>
@@ -365,7 +351,7 @@
     if (!f) {
       f = document.createElement('iframe');
       f.src = view.dataset.src;
-      f.addEventListener('load', () => { window.SuiteTheme && SuiteTheme.frame(f); hookFrame(name, f); });
+      f.addEventListener('load', () => hookFrame(name, f));
       view.appendChild(f);
     }
     return f;

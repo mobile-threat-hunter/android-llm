@@ -14,6 +14,8 @@ export async function createApkllm({ log = () => {} } = {}) {
   const create = require(asset("apkllm-web", "apkllm.js"));
   const M = await create({ print: () => {}, printErr: (s) => log(String(s)), locateFile: (f) => asset("apkllm-web", f) });
   if (M.abi() !== D.ENGINE_ABI) throw new Error(`apkllm engine ABI ${M.abi()} ≠ domain.js ${D.ENGINE_ABI}`);
+  if (typeof M.frostingKeysDefault !== "function") throw new Error("apkllm engine without its frosting key");
+  const FROST_KEYS = D.frostingKeys(M.frostingKeysDefault());   // apkllm signing.FROSTING_KEYS_DEFAULT (엔진 내장)
   const VFS = "/input.apk";
   let loaded = false;
 
@@ -38,17 +40,19 @@ export async function createApkllm({ log = () => {} } = {}) {
       const signing = D.signingBlock(M.signingBlockPairs(VFS, D.PAIRS_CAP, D.PAIR_IDS));
       const traces = M.buildTraces(VFS);
       const certs = M.signingCerts(VFS);
-      const frosting = D.frostingView(M.frosting(VFS, D.frostingKeys()), signing, tamper);
+      const frosting = D.frostingView(M.frosting(VFS, FROST_KEYS), signing, tamper);
       const content = M.contentMap(VFS, D.HEAD_BYTES);
       if (content.ok) {
         const heads = M.entryHeads(VFS, D.HEAD_BYTES, null);
         content.heads = content.entries.map((e, i) => {
           const h = heads.ok ? heads.entries[i] : undefined;
           return h && h.name === e.name && h.name_hex === e.name_hex
-            ? { name: h.name, disposition: h.disposition, complete: h.complete, head: h.head } : null;
+            ? { name: h.name, disposition: h.disposition, complete: h.complete, uncompressed_size: h.uncompressed_size, error: h.error ?? null, head: h.head } : null;
         });
       }
-      return { tamper, signing, traces, certs, frosting, content, input };
+      // libziparchive가 파일을 거부(open_error)했을 때만 LFH 체인
+      const lfh = content.open_error || traces.open_error ? M.lfhChain(VFS) : null;
+      return { tamper, signing, traces, certs, frosting, content, lfh, input, headBytes: D.HEAD_BYTES };
     });
   }
 
